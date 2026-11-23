@@ -475,3 +475,56 @@ test('after an installed copy is skipped, a refresh whose only change is list.ac
   assert.equal(h.logs.filter((m) => m.startsWith('grazr: panel skipped')).length, 1)
   assert.equal(fs.renames.length, 0)
 })
+
+// A page left on disk by an older template: the marker of another template.
+const OLD_PAGE = '<main>old</main><script>const D = {};</script>\n<!--grazr-template:0123456789abcdef-->\n'
+
+test('an open page whose file was built from another template is written once, then posted to with the same template', async () => {
+  const p = poster()
+  const h = harness({ post: p.post })
+  h.fs.files.set(PANEL, OLD_PAGE)
+  h.panel.open = true
+  assert.equal(await h.refresher.refresh(), 'written')
+  assert.equal(h.fs.renames.length, 1)
+  assert.equal(p.posts.length, 0)
+  h.state.report = report(10)
+  h.clock.now = 5000
+  assert.equal(await h.refresher.refresh(), 'posted')
+  assert.equal(h.fs.renames.length, 1)
+  assert.equal(p.posts.length, 1)
+})
+
+test('a fresh worker after the rewrite finds the marker matching and does not write again', async () => {
+  const p = poster()
+  const first = harness({ post: p.post })
+  first.fs.files.set(PANEL, OLD_PAGE)
+  first.panel.open = true
+  assert.equal(await first.refresher.refresh(), 'written')
+  const second = harness({ post: p.post, fs: first.fs })
+  second.panel.open = true
+  assert.equal(await second.refresher.refresh(), 'unchanged')
+  second.state.report = report(10)
+  second.clock.now = 5000
+  assert.equal(await second.refresher.refresh(), 'posted')
+  assert.equal(first.fs.renames.length, 1)
+})
+
+test('an open page with the same template and changed data is posted, not written', async () => {
+  const p = poster()
+  const h = harness({ post: p.post })
+  await h.refresher.refresh()
+  h.panel.open = true
+  h.state.report = report(10)
+  h.clock.now = 5000
+  assert.equal(await h.refresher.refresh(), 'posted')
+  assert.equal(h.fs.renames.length, 1)
+})
+
+test('an open page whose file has no template marker is written', async () => {
+  const p = poster()
+  const h = harness({ post: p.post })
+  h.fs.files.set(PANEL, '<main>hand made</main>')
+  h.panel.open = true
+  assert.equal(await h.refresher.refresh(), 'written')
+  assert.equal(p.posts.length, 0)
+})

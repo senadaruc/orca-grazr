@@ -4,6 +4,12 @@ All notable changes to this plugin are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 0.11.1 - 2026-11-23
+
+### Fixed
+
+- A panel page on disk built from an older template is rewritten once instead of only being posted to. Pages carry a template marker (a comment at their end); a worker finding another marker, or none, writes the file even while a page is open, once per template, so it cannot loop. Before, a page left by an older release kept its old script and styles through every later release.
+
 ## 0.11.0 - 2026-11-23
 
 Summarises 0.9.12 through 0.11.0. Needs the same Orca as 0.9.11. The bundled engine is `0.4.7+fork.16`: run `Grazr: Install engine on target` on each host.
