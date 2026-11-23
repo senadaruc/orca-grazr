@@ -93,7 +93,7 @@ Add a remote host to `hosts` in `settings.json`. Each host has these fields:
 - `python`: the Python 3 interpreter on that host. The default is `python3`.
 - `claudeBin`: optional. The Claude Code binary on that host, run for a sign-in over `ssh`. The default is `~/.local/bin/claude`. A value that is blank or starts with `-` falls back to the default.
 - `orcaEnvironment`: optional. The name of the Orca environment this host is paired as. The panel matches a workspace on that environment to this host. The default is the host's `name` for an ssh host, and none for this Mac. A value that starts with `-` is ignored.
-- `notifier`: how the engine reports notices. This Mac uses `osascript`, so the engine posts macOS notifications directly. Remote hosts use `queue`, and the plugin drains and shows those notices.
+- `notifier`: how the engine reports notices. Every host uses `queue` by default, this Mac included: the engine queues each notice and the plugin shows it as an Orca notification on its next drain. `osascript` posts a macOS notification directly, which macOS files under Script Editor; set it on the host to bring that back. A comma list fans out to each channel, so `queue,osascript` shows each notice through Orca and through macOS. With `queue`, notices appear only while Orca is running; otherwise they wait in the queue until Orca is back. A change to the Mac host's notifier reinstalls its status line and failure hook (they carry the notifier) the next time the plugin starts, when grazr is connected there.
 - `forceInstall`: optional, `true` or `false`. It overrides the global `forceInstall` for this host only. Leave it out to follow the global value.
 
 For example, a remote box named `devbox`, reached through the `ssh` alias of the same name:
@@ -102,7 +102,7 @@ For example, a remote box named `devbox`, reached through the `ssh` alias of the
 { "name": "devbox", "ssh": "devbox", "python": "python3", "notifier": "queue" }
 ```
 
-A host list that includes the Mac must keep the Mac's entry with `"ssh": null` and `"notifier": "osascript"`. A comma list in `notifier` fans out to each channel, so `queue,osascript` on the Mac would show each notice twice.
+A host list that includes the Mac must keep the Mac's entry with `"ssh": null` and a `notifier` (`queue` by default).
 
 ## Ultra accounts
 
@@ -267,7 +267,7 @@ A remote host with an older engine still renders: its accounts are grouped by e-
 
 ## Notifications
 
-On this Mac the engine posts its notices as macOS notifications directly. Each remote host whose `notifier` includes `queue` queues its notices, and the plugin drains those queues every `drainIntervalMs` and shows each one as an OS notification. A host without the engine installed is logged and retried quietly, with backoff capped at 10 minutes. An unreachable host is reported once, then retried with backoff; its later failures do not toast again until it recovers.
+Notices reach Orca through each host's queue; this Mac's default notifier is `queue` too, with `osascript` as an opt-in. Each host whose `notifier` includes `queue` queues its notices, and the plugin drains those queues every `drainIntervalMs` and shows each one as an OS notification. A host without the engine installed is logged and retried quietly, with backoff capped at 10 minutes. An unreachable host is reported once, then retried with backoff; its later failures do not toast again until it recovers.
 
 ## Limits
 

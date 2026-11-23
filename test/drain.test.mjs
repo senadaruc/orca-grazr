@@ -448,3 +448,27 @@ test('a forced tick queued behind a run that leaves 3 s after the kill grace sti
   assert.equal(h.runnerCalls[1].opts.timeoutMs, 3500)
   assert.equal(h.runnerCalls[0].opts.timeoutMs, 10000)
 })
+
+test('the local Mac host is drained by running the engine on this machine, without ssh', async () => {
+  const { createRunner } = await import('../lib/runner.mjs')
+  const settings = mergeSettings({})
+  const execs = []
+  const exec = async (argv, opts) => {
+    execs.push({ argv, env: opts.env })
+    return { code: 0, stdout: `${line('now on b', 'swapped')}\n`, stderr: '', timedOut: false, spawnError: null }
+  }
+  const shown = []
+  const loop = createDrainLoop({
+    loadSettings: async () => settings,
+    runnerFor: (fresh) => createRunner({ settings: fresh, exec, homedir: () => '/home/t' }),
+    host: async (name, params) => { shown.push({ name, params }) },
+    timers: fakeTimers().timers,
+    storage: { get: async () => undefined, set: async () => {} },
+  })
+  await loop.tick({ force: true })
+  const local = execs.find((e) => e.argv[0] === 'python3')
+  assert.deepEqual(local.argv, ['python3', '/home/t/.local/share/orca-grazr/engine/grazr.py', 'notices-drain'])
+  assert.equal(local.env.GRAZR_STATE_DIR, '/home/t/.local/state/orca-grazr')
+  assert.ok(execs.filter((e) => e.argv[0] !== '/usr/bin/ssh').length === 1)
+  assert.deepEqual(shown.find((s) => s.params.title === 'mac: now on b').params, { title: 'mac: now on b', body: 'swapped' })
+})

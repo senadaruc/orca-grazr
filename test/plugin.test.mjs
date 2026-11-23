@@ -198,7 +198,7 @@ test('enrol on mac types the exact local command without pressing Return', async
   assert.deepEqual(hostCalls(fake, 'terminal.sendText'), [{
     terminalId: 't1',
     enter: false,
-    text: 'GRAZR_STATE_DIR=/home/t/.local/state/orca-grazr GRAZR_CONFIG_DIR=/home/t/.config/orca-grazr GRAZR_NOTIFIER=osascript python3 /home/t/.local/share/orca-grazr/engine/grazr.py enrol',
+    text: 'GRAZR_STATE_DIR=/home/t/.local/state/orca-grazr GRAZR_CONFIG_DIR=/home/t/.config/orca-grazr GRAZR_NOTIFIER=queue python3 /home/t/.local/share/orca-grazr/engine/grazr.py enrol',
   }])
 })
 

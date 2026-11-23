@@ -4,6 +4,13 @@ All notable changes to this plugin are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 0.11.3 - 2026-11-23
+
+### Changed
+
+- Notices on the Mac go through Orca's notifications via the queue instead of AppleScript. They appear only while Orca runs. `osascript` or `queue,osascript` is still available as the host's notifier.
+- A stored `osascript` from the old default is moved to `queue` once, and the status line and hook command are re-installed.
+
 ## 0.11.2 - 2026-11-23
 
 ### Changed

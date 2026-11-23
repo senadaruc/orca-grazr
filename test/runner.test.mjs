@@ -32,7 +32,7 @@ test('local command passes expanded GRAZR_* variables and keeps PATH from the pr
   const { env } = command(mac, ['status', '--json'])
   assert.equal(env.GRAZR_STATE_DIR, '/home/t/.local/state/orca-grazr')
   assert.equal(env.GRAZR_CONFIG_DIR, '/home/t/.config/orca-grazr')
-  assert.equal(env.GRAZR_NOTIFIER, 'osascript')
+  assert.equal(env.GRAZR_NOTIFIER, 'queue')
   assert.equal(env.PATH, process.env.PATH)
 })
 

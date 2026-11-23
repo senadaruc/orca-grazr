@@ -40,13 +40,13 @@ test('mergeSettings fills per-host defaults for a bare user-written host', () =>
   ])
 })
 
-test('the Mac host notifies through osascript only, so queued notices are not shown twice', () => {
-  assert.equal(DEFAULT_SETTINGS.hosts[0].notifier, 'osascript')
+test('the Mac host notifies through the queue by default, so Orca shows its notices', () => {
+  assert.equal(DEFAULT_SETTINGS.hosts[0].notifier, 'queue')
   assert.equal(fixtureSettings().hosts[1].notifier, 'queue')
 })
 
 test('the shipped default is the local Mac alone', () => {
-  assert.deepEqual(DEFAULT_SETTINGS.hosts, [{ name: 'mac', ssh: null, python: 'python3', notifier: 'osascript' }])
+  assert.deepEqual(DEFAULT_SETTINGS.hosts, [{ name: 'mac', ssh: null, python: 'python3', notifier: 'queue' }])
 })
 
 test('forceInstallFor uses the global value when the host has no override', () => {
@@ -154,8 +154,14 @@ test('engineEnv returns exactly the three GRAZR keys with raw strings', () => {
   assert.deepEqual(env, {
     GRAZR_STATE_DIR: '~/.local/state/orca-grazr',
     GRAZR_CONFIG_DIR: '~/.config/orca-grazr',
-    GRAZR_NOTIFIER: 'osascript',
+    GRAZR_NOTIFIER: 'queue',
   })
+})
+
+test('a notifier the user gives the Mac host wins over the default', () => {
+  const own = { name: 'mac', ssh: null, python: 'python3', notifier: 'osascript' }
+  assert.equal(mergeSettings({ hosts: [own] }).hosts[0].notifier, 'osascript')
+  assert.equal(mergeSettings({ hosts: [{ ...own, notifier: 'queue,osascript' }] }).hosts[0].notifier, 'queue,osascript')
 })
 
 test('enginePath joins engineDir and grazr.py', () => {
