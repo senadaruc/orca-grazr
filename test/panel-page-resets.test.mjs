@@ -40,7 +40,7 @@ const labels = (html) => [...html.matchAll(/<button class="act act-reset"[^>]*>(
 test('a reading with model resets only offers only Fable reset on the active account, with the count and expiry on the chip', () => {
   const a = acct(cardOf(fixture(), { a: ok([FABLE]) }), 'a')
   assert.deepEqual(labels(a), ['Fable reset'])
-  assert.ok(a.includes('title="Type /limit-reset fable into the terminal; Claude names the reset and asks before using it">Fable reset</button>'))
+  assert.ok(a.includes('title="Uses the Fable reset of this account now on claude.ai, without asking again">Fable reset</button>'))
   assert.ok(a.includes('<span class="chip chip-on" title="2 Fable resets, all expire Mar 9, 2027, 8:59 AM GMT+1">2 resets available</span>'))
 })
 
@@ -54,9 +54,9 @@ test('a reading of no resets offers none, even on the active account and over a 
   assert.equal(html.includes('Reset available'), false)
 })
 
-test('a parked account whose page counts a full reset offers only Swap + Full reset', () => {
+test('a parked account whose page counts a full reset offers only Full reset', () => {
   const b = acct(cardOf(fixture(), { b: ok([FULL]) }), 'b')
-  assert.deepEqual(labels(b), ['Swap + Full reset'])
+  assert.deepEqual(labels(b), ['Full reset'])
   assert.ok(b.includes('data-command="limit-reset-full" data-params="{&quot;host&quot;:&quot;mac&quot;,&quot;account&quot;:&quot;b&quot;}"'))
   assert.ok(b.includes('<span class="chip chip-on" title="1 full reset, expires Dec 10, 11:00 PM GMT+1">1 reset available</span>'))
 })
@@ -70,7 +70,7 @@ test('both kinds read: both buttons, and the hover names each kind with its expi
 test('without a reading the 0.9.7 rule holds: the active account offers both, not known, and a parked one none', () => {
   const html = cardOf(fixture(), {})
   assert.deepEqual(labels(acct(html, 'a')), ['Model reset', 'Full reset'])
-  assert.ok(acct(html, 'a').includes('not known whether a reset is available'))
+  assert.ok(acct(html, 'a').includes('if claude.ai offers one'))
   assert.deepEqual(labels(acct(html, 'b')), [])
   assert.equal(html.includes('Reset available'), false)
 })
@@ -78,7 +78,7 @@ test('without a reading the 0.9.7 rule holds: the active account offers both, no
 test('a reading older than 12 hours counts as none at all: the 0.9.7 rule holds', () => {
   const html = cardOf(fixture(), { a: ok([FABLE], 13 * HOUR), b: ok([FULL], 13 * HOUR) })
   assert.deepEqual(labels(acct(html, 'a')), ['Model reset', 'Full reset'])
-  assert.ok(acct(html, 'a').includes('not known whether a reset is available'))
+  assert.ok(acct(html, 'a').includes('if claude.ai offers one'))
   assert.deepEqual(labels(acct(html, 'b')), [])
 })
 
@@ -96,7 +96,7 @@ test('the dial and clock rows follow the reading: the count in the label, its ki
   const a = row(html, 'a')
   assert.ok(a.includes('<span class="row-label" title="2 Fable resets, all expire Mar 9, 2027, 8:59 AM GMT+1">active · 2 resets available</span>'))
   assert.deepEqual(labels(a), ['Fable reset'])
-  assert.deepEqual(labels(row(html, 'b')), ['Swap + Full reset'])
+  assert.deepEqual(labels(row(html, 'b')), ['Full reset'])
 })
 
 test('a reading of an account applies to that account on every host', () => {
@@ -114,17 +114,17 @@ test('a reading of an account applies to that account on every host', () => {
   }
 })
 
-test('the model reset buttons name the model, keep the same action, and fall back to Model reset', () => {
+test('the model reset buttons name the model, keep the same command, and fall back to Model reset', () => {
   const OPUS = { kind: 'model', label: 'Opus', count: 1, expires: 'Expires Dec 1' }
   const NAMELESS = { kind: 'model', label: '', count: 1, expires: '' }
   const named = cardOf(fixture(), { a: ok([FABLE]), b: ok([FABLE]) })
   assert.deepEqual(labels(acct(named, 'a')), ['Fable reset'])
-  assert.deepEqual(labels(acct(named, 'b')), ['Swap + Fable reset'])
+  assert.deepEqual(labels(acct(named, 'b')), ['Fable reset'])
   const unnamed = cardOf(fixture(), {})
   const attrs = (html) => html.match(/<button class="act act-reset"[^>]*data-command="limit-reset-model"[^>]*>/)[0]
-  assert.ok(attrs(acct(named, 'a')).includes('data-text="reset model" data-command="limit-reset-model" data-params="{&quot;host&quot;:&quot;mac&quot;}"'))
-  assert.ok(attrs(acct(named, 'b')).includes('data-text="reset model" data-command="limit-reset-model"'))
-  assert.ok(attrs(acct(named, 'b')).includes('Swap mac to b, then type /limit-reset fable into the terminal'))
+  assert.ok(attrs(acct(named, 'a')).includes('data-text="" data-command="limit-reset-model" data-params="{&quot;host&quot;:&quot;mac&quot;}"'))
+  assert.ok(attrs(acct(named, 'b')).includes('data-text="" data-command="limit-reset-model"'))
+  assert.ok(attrs(acct(named, 'b')).includes('Uses the Fable reset of b now on claude.ai, without asking again; b stays parked (Switch moves to it)'))
   assert.deepEqual(labels(acct(unnamed, 'a')), ['Model reset', 'Full reset'])
   assert.deepEqual(labels(acct(cardOf(fixture(), { a: ok([FABLE, OPUS]) }), 'a')), ['Model reset'])
   assert.deepEqual(labels(acct(cardOf(fixture(), { a: ok([NAMELESS]) }), 'a')), ['Model reset'])

@@ -18,6 +18,12 @@ export const MANUAL_OUTPUT = `${VISIT}${PROMPT}`
 export const EXPORT = { identity: { emailAddress: 'a@example.com' }, blob: { claudeAiOauth: { accessToken: 'sk-secret-blob' } } }
 export const EXPORT_LINE = `${JSON.stringify(EXPORT)}\n`
 export const OK_ENROL = '{"ok":true,"email":"a@example.com","unblocked":true}\n'
+// The accounts every host of these tests has enrolled, one organization per login, as an engine from fork.16 on reports them.
+export const ENROLLED = [
+  { id: 'ua', name: 'a@example.com', email: 'a@example.com', login: 'ua', organization_uuid: 'oa', organization: "a@example.com's Organization" },
+  { id: 'ux', name: 'x@example.com', email: 'x@example.com', login: 'ux', organization_uuid: 'ox', organization: 'XY' },
+]
+export const statusReply = (accounts = ENROLLED, version = '0.4.7+fork.16') => ({ stdout: `${JSON.stringify({ version, accounts })}\n` })
 export const NOW = new Date(2026, 9, 31, 14, 5)
 export const STAMP = '2026-10-31 14:05'
 export const D1 = '/var/folders/t/tmp.1'
@@ -67,6 +73,8 @@ export function harness({ settings = SETTINGS, overrides = {}, spawnThrows = nul
   let made = 0
   const routes = {
     'mktemp -d': () => ({ stdout: `/var/folders/t/tmp.${++dirs}\n` }),
+    // The card host's accounts: a re-authentication and another organization read them before anything starts.
+    'status --json': () => statusReply(),
     'login-export': () => ({ stdout: EXPORT_LINE }),
     'enrol --from': () => ({ stdout: OK_ENROL }),
     'enrol --stdin': () => ({ stdout: OK_ENROL }),
@@ -194,6 +202,25 @@ export async function openRemoteTab(h, account = null, host = DEV, settings = SE
   const spawned = h.spawns.length
   const tabs = callsWith(h, 'tab create').length
   h.jobs.start({ host, settings, account })
+  await until(() => h.spawns.length === spawned + 1)
+  const login = h.spawns.at(-1).child
+  login.emitPid()
+  login.emitUrl()
+  await until(() => callsWith(h, 'tab create').length === tabs + 1)
+  return login
+}
+
+// An export of a login signed in to the given organization, as `login-export` prints it.
+export const exportOf = ({ email = 'a@example.com', login = 'ua', organization, organizationName }) => ({
+  stdout: `${JSON.stringify({ identity: { emailAddress: email, accountUuid: login, organizationUuid: organization, organizationName }, blob: '{"claudeAiOauth":{"accessToken":"sk-secret-blob"}}' })}\n`,
+})
+
+// Starts a sign-in for another organization of the login of email and gets it to the point where the browser tab is open.
+export async function openOrganizationTab(h, email = 'a@example.com', host = DEV, settings = SETTINGS) {
+  const spawned = h.spawns.length
+  const tabs = callsWith(h, 'tab create').length
+  const started = await h.jobs.start({ host, settings, email, organization: true })
+  assert.equal(started.ok, true, started.message)
   await until(() => h.spawns.length === spawned + 1)
   const login = h.spawns.at(-1).child
   login.emitPid()

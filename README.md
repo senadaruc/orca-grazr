@@ -50,6 +50,7 @@ Grazr runs on official Orca. Its actions are commands in the Cmd-J palette, and 
 
 - `Grazr: Re-authenticate a blocked account (this workspace's server)` signs in the first blocked account in rotation order.
 - `Grazr: Add an account (this workspace's server)` signs in a new account.
+- `Grazr: Sign in another organization of the active login (this workspace's server)` signs in another organization of the login that server is using.
 - `Grazr: Swap to the next account (this workspace's server)`, `Grazr: Refresh usage (this workspace's server)` and `Grazr: Turn rotation on/off (this workspace's server)` act on the focused workspace's server. When Orca does not report the focused workspace, they act on the target instead.
 
 `Install engine`, `Uninstall` and `Target → next host` act on the target, as their titles say. Assign shortcuts to any of these commands in Orca's Shortcuts settings.
@@ -74,7 +75,7 @@ Orca keeps the settings in `<userData>/plugins-data/senadaruc.grazr/settings.jso
 - `panelFace`: the face every card opens with: `clock`, `dial` or `list`. The default is `clock`.
 - `panelView`: the window every card opens with: `session` (5h) or `weekly` (Week). The default is `session`. A host whose accounts with readings are all Ultra accounts with no 5-hour limit opens on Week whatever this says.
 - `browserOnSwap`: whether a swap from the panel or the palette also opens claude.ai as the account swapped to, in that account's browser profile (see [Browser profiles](#browser-profiles)). The default is `true`. Automatic rotation by the engine never opens a browser.
-- `readLimitResets`: whether Grazr reads each account's limit resets from claude.ai's Settings › Usage page, in that account's browser profile (see [Limit resets](#limit-resets)). The default is `true`. With `false` nothing is opened, and the panel goes by Claude Code's own note alone.
+- `readLimitResets`: whether Grazr reads each login's organizations and limit resets from claude.ai, in that login's browser profile (see [Limit resets](#limit-resets)). The default is `true`. With `false` nothing is opened, no organizations are discovered, and the panel goes by Claude Code's own note alone.
 - `orcaBin`: the Orca CLI that opens each sign-in tab in a local Orca workspace. The default is `/usr/local/bin/orca`. A value that is blank or starts with `-` falls back to the default.
 - `signinWorkspace`: optional. The local Orca worktree the sign-in tab opens in, as an `id:<worktree id>` or `path:<folder>` selector. When it is unset, the first local worktree is used, and the plugin's own folder when it is one.
 - `signinHost`: optional. The name of a configured remote host. A sign-in for a card on this Mac logs in on it. When it is unset, the first remote host is used.
@@ -114,8 +115,9 @@ An Ultra account (the plan formerly called Max 20x) has no 5-hour limit under th
 How a sign-in works:
 
 - The login runs on one of your ssh hosts, in a throwaway directory there, over plain `ssh` with its stdin kept open (no pty). A card on a remote host logs in on that host. A card on this Mac logs in on `signinHost`, or on the first remote host. Without a remote host to log in on, the sign-in is refused at once.
-- The sign-in tab opens in a local Orca workspace on this Mac (`signinWorkspace`, or the first local worktree), in Orca's built-in browser, in an isolated browser profile, and is brought to the front. The start message names that workspace. A re-authentication uses the account's own profile. An add-account sign-in gets a fresh profile, `grazr · new account <yyyy-mm-dd hh:mm>`, which becomes the account's profile once it is enrolled, and is deleted when the sign-in fails or is cancelled (see [Browser profiles](#browser-profiles)).
+- The sign-in tab opens in a local Orca workspace on this Mac (`signinWorkspace`, or the first local worktree), in Orca's built-in browser, in an isolated browser profile, and is brought to the front. The start message names that workspace. A re-authentication, and another organization of a login, use the login's own profile. An add-account sign-in gets a fresh profile, `grazr · new account <yyyy-mm-dd hh:mm>`, which becomes the account's profile once it is enrolled, and is deleted when the sign-in fails or is cancelled (see [Browser profiles](#browser-profiles)).
 - The sign-in fills in the e-mail and approves Claude Code, so you only type the code from the e-mail. A re-authentication fills in the account's e-mail, presses Continue and opens the code box, and Claude Code's consent is clicked once. An add-account sign-in leaves the e-mail to you. The plugin never fills the code box. Open the e-mail's link on another device (your phone), not in Orca's tab: a link opened there cannot sign the login in, so the tab is sent back to the start with a notice.
+- A re-authentication reads the account's e-mail and organization from a fresh status of its host, never from the panel, asks claude.ai for that organization, and refuses an enrolment of another e-mail or organization. Another organization of a login is covered in [Several organizations of one login](#several-organizations-of-one-login).
 - Approving in the tab sends the code back to the login by itself: the plugin reads the tab's address, and when it is Claude's code callback for this sign-in (matched by its state), it writes the code into the login's stdin, once. Nothing is copied by hand, and the code is never logged or shown.
 - A sign-in that is steered off the authorize flow is returned to it, at most five times.
 - Only an https address on claude.ai, claude.com or anthropic.com is opened. Anything else is refused and nothing is opened.
@@ -162,9 +164,10 @@ These commands appear in the Orca command palette. A command whose title says "t
 - `Grazr: Swap to the next account (this workspace's server)`: swaps the focused workspace's server to its next account now.
 - `Grazr: Re-authenticate a blocked account (this workspace's server)`: signs in the first blocked account in rotation order on the focused workspace's server. It says so when no account is blocked.
 - `Grazr: Add an account (this workspace's server)`: signs in a new account on the focused workspace's server.
+- `Grazr: Sign in another organization of the active login (this workspace's server)`: signs in another organization of the login the focused workspace's server is using, and enrols it as an account of its own (see [Several organizations of one login](#several-organizations-of-one-login)).
 - `Grazr: Refresh usage (this workspace's server)`: refreshes every account on the focused workspace's server, including the active one. It asks Claude's usage endpoint and refreshes any lapsed token.
 - `Grazr: Open claude.ai as the active account (this workspace's server)`: opens claude.ai in Orca's browser, in the browser profile of that server's active account, so it is already signed in as that account. A claude.ai tab already open in that profile is brought to the front instead.
-- `Grazr: Use a model limit reset (type /limit-reset fable into terminal)` and `Grazr: Use a full limit reset (type /limit-reset full into terminal)`: type Claude Code's own `/limit-reset` for that server into the newest terminal of the focused worktree, without pressing Return. Claude names the reset and asks before it uses one; the plugin spends nothing itself.
+- `Grazr: Use a model limit reset on claude.ai (active account of this workspace's server)` and `Grazr: Use a full limit reset on claude.ai (active account of this workspace's server)`: use that reset of the server's active account on claude.ai at once, as the panel's reset buttons do (see [Using a reset](#using-a-reset)). No terminal or worktree is needed.
 - `Grazr: Turn rotation on/off (this workspace's server)`: turns automatic rotation on or off on the focused workspace's server.
 - `Grazr: Install engine on target`: copies the engine to the target and installs grazr's status line and failure hook.
 - `Grazr: Uninstall from target`: removes grazr's status line and failure hook from the target.
@@ -188,7 +191,7 @@ Each card, under its tab, shows:
 - A `Dial | Clock | List` switch. Hovering a segment shows its account, the percentage left, the swap threshold and the reset time.
 - Colours by account state: red for an account that is spent or blocked, green at reduced opacity for a parked account that still has tokens, grey for an unknown or unenrolled account, and orange and dashed for the next account.
 - One row per account, with its percentage and status: `active`, `NEXT ▸`, `spent · resets <day and time>`, `blocked: <reason>`, `not read yet` or `not enrolled`.
-- Buttons. Every button says what it does on hover. A card has `Refresh`, which asks Claude for fresh usage on that server and redraws the panel when it answers, and on a reachable host `Add account…`, `Swap to next` and the rotation switch. A row has `Swap to` or `Switch`, `Re-authenticate…` when it is blocked, `Open claude.ai` (see [Browser profiles](#browser-profiles)) and the reset buttons (see [Limit resets](#limit-resets)).
+- Buttons. Every button says what it does on hover. A card has `Refresh`, which asks Claude for fresh usage on that server and redraws the panel when it answers, and on a reachable host `Add account…`, `Swap to next` and the rotation switch. A row has `Swap to` or `Switch`, `Re-authenticate…` when it is blocked, `Open claude.ai` (see [Browser profiles](#browser-profiles)) and the reset buttons (see [Limit resets](#limit-resets)). A login's group header, and the List card of a login with one account, have `Sign in another organization…`, and a discovered organization that is not enrolled has `Sign in…` (see [Several organizations of one login](#several-organizations-of-one-login)).
 
 The rows, the ring's segments and the list's cards are in the same order on every face, rearranged as the accounts change: the active account first, then the accounts usable now in rotation order (the first is `NEXT ▸`), then the spent ones, the one that has tokens again soonest first, and last the accounts grazr cannot swap to (blocked, no parked login, or not enrolled). The number on a row is its place in that order, and the clock's dots carry the same numbers. An account keeps its colour however it moves. The order is only how the panel shows the accounts: rotation still follows the engine's order.
 
@@ -212,7 +215,7 @@ A host that times out under a short command budget keeps its last reading. A hos
 
 ## Browser profiles
 
-Orca's built-in browser keeps one cookie jar per browser profile. Grazr keeps one profile per account, so claude.ai stays signed in as that account there. It remembers which profile belongs to which account by the profile's id, in the plugin's storage (`browserProfiles`), so a relabelled profile is still the account's. A profile Grazr creates for an account is labelled `grazr · <account>`.
+Orca's built-in browser keeps one cookie jar per browser profile. Grazr keeps one profile per login, shared by the login's organizations, so claude.ai stays signed in as that login there. It remembers which profile belongs to which login by the profile's id, in the plugin's storage (`browserProfiles`, keyed by the login's e-mail and by each account name), so a relabelled profile is still the login's. A profile Grazr creates for a login is labelled `grazr · <email>`; one made before 0.11.0 keeps its `grazr · <account>` label and is still found.
 
 - `Open claude.ai` on an account's row, and `Grazr: Open claude.ai as the active account (this workspace's server)`, bring a claude.ai tab open in the account's profile to the front, or open `https://claude.ai/` in that profile in the sign-in workspace. An account with no profile yet gets one, and claude.ai asks for one sign-in there; the profile is the account's from then on.
 - A swap from the panel or the palette opens claude.ai as the account swapped to, once the swap has answered, with the outcome as a toast. `browserOnSwap: false` turns that off.
@@ -220,23 +223,47 @@ Orca's built-in browser keeps one cookie jar per browser profile. Grazr keeps on
 
 ## Limit resets
 
-An account can hold unused limit resets, which Claude Code spends with its own `/limit-reset` command. Grazr shows them and offers buttons that type that command for you.
+An account can hold unused limit resets. Grazr shows them, and its reset buttons use them on claude.ai in one press.
 
-Grazr reads each account's resets from claude.ai's Settings › Usage page, the `Limit resets` section, in the account's browser profile:
+Grazr reads the resets from claude.ai's own data, in each login's browser profile, one login after another and one tab per login:
 
-- It opens `https://claude.ai/settings/usage` in a background tab of the sign-in workspace, reads the page's text, and closes the tab. It never clicks anything there. Accounts are read one after another.
+- It opens `https://claude.ai/settings/usage` in a background tab of the sign-in workspace and, from inside the page, asks claude.ai with GET requests only for the login's organizations, the one selected there (the `lastActiveOrg` cookie, read and never set by a reading), and for each organization that can chat its limit-reset grants. Then it closes the tab. A reading never clicks anything.
+- Resets are read per organization. Each account is matched to its organization by the `organization_uuid` the engine reports (an account an older engine reports none for, to its login's only subscription organization), and only ever gets its own organization's grants. A grant that clears the weekly window is a full reset; one that does not is a model reset, named after its model (`Fable`).
+- When claude.ai's data cannot be read, a login with one enrolled account and at most one subscription organization falls back to the text of the Usage page's `Limit resets` section, and the log says so. A login with several organizations then gets no reading, since the page shows only the organization selected there.
 - It reads every 3 hours while the plugin runs, a minute after start when the last reading is older than that, and after a card's `Refresh`. `readLimitResets: false` turns it off.
-- Readings are kept in the plugin's storage (`limitResets`). A reading older than 12 hours counts as none, and a failed read keeps the last good one until then.
-- Only accounts that already have a browser profile are read; Grazr creates none for this. An account without one, or whose profile is signed out, says so in the hover text of its `Open claude.ai` button. Sign in there once.
+- Readings are kept in the plugin's storage (`limitResets`, by account name, with the organization and whether they came from the data or the page), and each login's organizations under `organizations` (by e-mail: uuid, name, plan and kind only). A reading older than 12 hours counts as none, and a failed read keeps the last good one until then.
+- Only logins that already have a browser profile are read; Grazr creates none for this. An account without one, or whose profile is signed out, says so in the hover text of its `Open claude.ai` button. Sign in there once.
+- The readings are made on this Mac, where the profiles are, and apply to every host's card.
 
 What the panel offers:
 
-- With a current reading, an account offers exactly the resets the page counts: a model reset (the button names the model, e.g. `Fable reset`) when it holds one, and `Full reset` when it holds a full one. The chip and the row say how many resets the page counted, and their hover text says which and until when. An account the page shows without resets offers none.
-- Without a reading the panel goes by Claude Code's own note of the account, passed on by the engine, which lapses after three days. `Reset available` shows when Claude noted an unused reset. The active account offers both buttons unless Claude noted it holds none; a parked account offers them only on Claude's note.
-- On the active account a reset button types `claude '/limit-reset fable'` or `claude '/limit-reset full'` (over `ssh -t` for a remote host) into the newest terminal of the worktree, without pressing Return. On a parked account the buttons read `Swap + …`: Claude uses a reset for the login it runs on, so the host is swapped to that account first, then the command is typed. No swap is made when no terminal is open.
-- Claude names the reset and asks before it uses one. Grazr never presses `Reset for free` itself.
+- With a current reading, an account offers exactly the resets it counts: a model reset (the button names the model, e.g. `Fable reset`) when it holds one, and `Full reset` when it holds a full one. A kind claude.ai counts but does not let be used right now shows greyed out, with claude.ai's reason as hover text. The chip and the row say how many resets there are, and their hover text says which and until when. An account read without resets offers none.
+- Without a reading the panel goes by Claude Code's own note of the account, passed on by the engine, which lapses after three days. `Reset available` shows when Claude noted an unused reset. The active account offers both buttons unless Claude noted it holds none; a parked account offers them only on Claude's note. An organization of a login with several offers buttons only with a reading of its own organization.
+- The buttons read the same on a parked account and never swap: the reset is used for that account where it stays parked, and `Switch` (or `Swap to`) is how to move to it.
 
-The reading depends on the page claude.ai shows the signed-in user, so it can stop working when that page changes. An unreadable page counts as not known, never as no resets. The resets are those of the organization the profile has selected. Every 3 hours a tab opens briefly in the background for each account with a profile.
+### Using a reset
+
+A reset button, or its palette command for the active account, uses the reset on claude.ai in one press, in the login's browser profile, on the account's organization:
+
+- The command answers at once (`Using a model reset of <account> on claude.ai…`), and the result comes as a notification. A second press for an account whose reset is under way is refused, and a reset never runs beside a scheduled reading.
+- It opens the Usage page in a background tab. When claude.ai has another organization of the login selected, Grazr selects the account's organization the way claude.ai's account menu does (the `lastActiveOrg` cookie), reloads the page, and checks that the page now shows that organization and counts what its grants count. Otherwise nothing is clicked (`could not switch claude.ai to <org> — select it in the account menu and try again`). The previous selection is put back afterwards.
+- It clicks `Reset for free` only in the row of that kind, matched by its title (a model's for a model reset, `Weekly reset` or `Full reset` for a full one). claude.ai greys the button out while its window has no focus, as a background tab never has, so Grazr tells the page it has focus, in its own tab only, and waits up to 10 s for the button. A button still greyed out is never clicked.
+- A confirmation dialog is answered only when it has exactly one confirming button. The reset counts as used when the organization's grants (or, without them, the page) count one fewer of that kind; otherwise the notification says it could not confirm the reset was used — check claude.ai.
+- The tab is closed in every case, and the new reading is stored, so the panel shows it at once. Once the reset counts as used, the host's usage is refreshed and the panel redrawn. Nothing is swapped.
+- On a remote host (e.g. `devbox`) it works the same: the browser profiles are on this Mac, and only the refresh goes to that host.
+
+This drives claude.ai's own page and data, which are not a published API, so it can stop working when Anthropic changes them. An unreadable answer counts as not known, never as no resets, and the plugin never claims a reset it did not see counted. Selecting an organization by its cookie has not been tried against a live session yet; the check after the reload is what keeps a reset from being used on another organization. Every 3 hours a tab opens briefly in the background for each login with a profile.
+
+## Several organizations of one login
+
+One Claude login (an e-mail) can belong to several organizations, each with its own plan and limits. With engine `0.4.7+fork.16` or later, which the plugin bundles, each organization is an account of its own: the first one of a login keeps its name (the e-mail), and each further one is named `<email>:<organization>` (lowercased, other characters as `-`, at most 24 characters, `-2`, `-3`… when taken). Run `Grazr: Install engine on target` on each host to update it.
+
+- **Grouping.** The panel keeps the organizations of one login together, under a header with the e-mail, ranked where the first of them ranks. Each row and List card of the group names its organization and plan instead of repeating the e-mail (`Personal` for the default `<email>'s Organization`). A login with one account and nothing more found looks as it always did. Rotation is not grouped: `NEXT ▸` and the swaps follow the engine's order, and the colours stay tied to each account.
+- **Discovery.** The organizations claude.ai lists for each login (read with its limit resets) that are not enrolled on a host close that login's group on its card, unnumbered and without a dial segment: one that can run Claude Code as not signed in, with `Sign in…`; a free one greyed as `Free plan — Claude Code needs a paid plan`; an API console one greyed as `API console organization — not a Claude subscription`.
+- **Sign in another organization.** `Sign in another organization…` (on the group header, on the List card of a login with one account, or from the palette for the active login) runs the usual sign-in for that e-mail in the login's browser profile. Grazr fills in the e-mail and leaves claude.ai's consent page to you: pick the organization there and approve Claude Code. `Sign in…` on a discovered organization does the same for that organization, taken from the list stored for that login, and asks claude.ai for it (`orgUUID`); the enrolment refuses another organization (`claude.ai signed in to <org>, not <wanted> — pick <wanted> on the authorize page`). An organization already enrolled is not enrolled twice, and a new one joins the end of the rotation order. A host whose engine is older than `0.4.7+fork.16` refuses it (`update the engine on <host> first`), since that engine would overwrite the login's first organization.
+- **Everything else** works as for any account: swapping by hand or by rotation, re-authenticating, limit resets per organization, and one browser profile per login.
+
+A remote host with an older engine still renders: its accounts are grouped by e-mail, get no discovered organizations, and get a reading only when their login has one subscription organization.
 
 ## Notifications
 

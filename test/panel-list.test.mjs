@@ -117,9 +117,9 @@ test('reset reads "resets <day> <time>" in the given zone, and is empty without 
 
 // --- account fields ---
 
-test('each entry has name, 1-based index, missing, active, blocked, listed, plan, organization, updated, reset, its page counts and state, action and windows', () => {
+test('each entry has name, 1-based index, missing, active, blocked, listed, plan, organization, updated, reset, its page counts and state, action, windows and its login group', () => {
   const [a] = listed(fixture())
-  assert.deepEqual(Object.keys(a).sort(), ['action', 'active', 'blocked', 'index', 'listed', 'missing', 'name', 'organization', 'plan', 'reset', 'resetCounts', 'resetPage', 'updated', 'windows'])
+  assert.deepEqual(Object.keys(a).sort(), ['action', 'active', 'blocked', 'claudeCode', 'discovered', 'email', 'group', 'groupLabel', 'index', 'listed', 'missing', 'name', 'orgLabel', 'organization', 'plan', 'reason', 'reset', 'resetCounts', 'resetPage', 'resetsSupported', 'updated', 'windows'])
   assert.equal(a.name, 'a')
   assert.equal(a.index, 1)
   assert.equal(a.missing, false)
@@ -191,7 +191,7 @@ test('an unreadable account keeps its entry with no windows', () => {
 })
 
 test('listOf gives an empty list for a report with no accounts', () => {
-  assert.deepEqual(listOf({}, { now: NOW, timeZone: TZ }), { accounts: [] })
+  assert.deepEqual(listOf({}, { now: NOW, timeZone: TZ }), { accounts: [], groups: [] })
 })
 
 // --- buildPanelData ---
@@ -263,7 +263,7 @@ test('every enrolled account offers Open claude.ai, carrying open-browser and it
 
 // --- limit resets ---
 
-const RESET_CMD = { ...CMD, resetModel: 'reset model', resetFull: 'reset full' }
+const RESET_CMD = CMD
 const withReset = (names) => {
   const report = fixture()
   for (const account of report.accounts) {
@@ -275,16 +275,17 @@ const withReset = (names) => {
 test('the active account with an unused reset says so and offers the model and the full reset', () => {
   const a = acct(cardOf(withReset(['a']), { commands: RESET_CMD }), 'a')
   assert.ok(a.includes('<span class="chip chip-on">Reset available</span>'))
-  assert.ok(a.includes('<button class="act act-reset" data-host="mac" data-text="reset model" data-command="limit-reset-model" data-params="{&quot;host&quot;:&quot;mac&quot;}" data-palette="Grazr: Use a model limit reset (type /limit-reset fable into terminal)" title="Type /limit-reset fable into the terminal; Claude names the reset and asks before using it">Model reset</button>'))
-  assert.ok(a.includes('<button class="act act-reset" data-host="mac" data-text="reset full" data-command="limit-reset-full" data-params="{&quot;host&quot;:&quot;mac&quot;}" data-palette="Grazr: Use a full limit reset (type /limit-reset full into terminal)" title="Type /limit-reset full into the terminal; Claude names the reset and asks before using it">Full reset</button>'))
+  assert.ok(a.includes('<button class="act act-reset" data-host="mac" data-text="" data-command="limit-reset-model" data-params="{&quot;host&quot;:&quot;mac&quot;}" data-palette="Grazr: Use a model limit reset on claude.ai (active account of this workspace&#39;s server)" title="Uses the model reset of this account now on claude.ai, without asking again">Model reset</button>'))
+  assert.ok(a.includes('<button class="act act-reset" data-host="mac" data-text="" data-command="limit-reset-full" data-params="{&quot;host&quot;:&quot;mac&quot;}" data-palette="Grazr: Use a full limit reset on claude.ai (active account of this workspace&#39;s server)" title="Uses the full reset of this account now on claude.ai, without asking again">Full reset</button>'))
 })
 
-test('a parked account with an unused reset says so and offers both resets, naming itself so the worker swaps first', () => {
+test('a parked account with an unused reset says so and offers both resets for itself, which leave it parked', () => {
   const b = acct(cardOf(withReset(['b']), { commands: RESET_CMD }), 'b')
   assert.ok(b.includes('Reset available'))
-  assert.ok(b.includes('<button class="act act-reset" data-host="mac" data-text="reset model" data-command="limit-reset-model" data-params="{&quot;host&quot;:&quot;mac&quot;,&quot;account&quot;:&quot;b&quot;}" data-palette="Grazr: Use a model limit reset (type /limit-reset fable into terminal)" title="Swap mac to b, then type /limit-reset fable into the terminal; Claude names the reset and asks before using it">Swap + Model reset</button>'))
+  assert.ok(b.includes('<button class="act act-reset" data-host="mac" data-text="" data-command="limit-reset-model" data-params="{&quot;host&quot;:&quot;mac&quot;,&quot;account&quot;:&quot;b&quot;}" data-palette="Grazr: Use a model limit reset on claude.ai (active account of this workspace&#39;s server)" title="Uses the model reset of b now on claude.ai, without asking again; b stays parked (Switch moves to it)">Model reset</button>'))
   assert.ok(b.includes('data-command="limit-reset-full" data-params="{&quot;host&quot;:&quot;mac&quot;,&quot;account&quot;:&quot;b&quot;}"'))
-  assert.ok(b.includes('>Swap + Full reset</button>'))
+  assert.ok(b.includes('>Full reset</button>'))
+  assert.equal(b.includes('Swap + '), false)
 })
 
 test('a blocked or unparked account with an unused reset offers no reset: it cannot be swapped to', () => {
@@ -308,8 +309,8 @@ test('with no note from Claude the active account offers both resets, saying it 
   report.accounts[2].unused_reset = 'yes'
   const html = cardOf(report, { commands: RESET_CMD })
   const a = acct(html, 'a')
-  assert.ok(a.includes('data-command="limit-reset-model" data-params="{&quot;host&quot;:&quot;mac&quot;}" data-palette="Grazr: Use a model limit reset (type /limit-reset fable into terminal)" title="Type /limit-reset fable into the terminal; not known whether a reset is available, Claude says so and asks before using one">Model reset</button>'))
-  assert.ok(a.includes('data-command="limit-reset-full" data-params="{&quot;host&quot;:&quot;mac&quot;}" data-palette="Grazr: Use a full limit reset (type /limit-reset full into terminal)" title="Type /limit-reset full into the terminal; not known whether a reset is available, Claude says so and asks before using one">Full reset</button>'))
+  assert.ok(a.includes('data-command="limit-reset-model" data-params="{&quot;host&quot;:&quot;mac&quot;}" data-palette="Grazr: Use a model limit reset on claude.ai (active account of this workspace&#39;s server)" title="Uses the model reset of this account now on claude.ai if claude.ai offers one, without asking again">Model reset</button>'))
+  assert.ok(a.includes('data-command="limit-reset-full" data-params="{&quot;host&quot;:&quot;mac&quot;}" data-palette="Grazr: Use a full limit reset on claude.ai (active account of this workspace&#39;s server)" title="Uses the full reset of this account now on claude.ai if claude.ai offers one, without asking again">Full reset</button>'))
   assert.equal(html.includes('Swap + '), false)
   for (const name of ['b', 'c', 'd']) assert.equal(acct(html, name).includes('act-reset'), false)
   assert.equal(html.includes('Reset available'), false)
@@ -324,7 +325,7 @@ test('the dial and clock rows mark an unused reset in the label and carry the bu
   assert.ok(active.includes('<span class="row-label">active · reset available</span>'))
   assert.ok(active.includes('data-command="limit-reset-model"') && active.includes('data-command="limit-reset-full"'))
   assert.ok(parked.includes('reset available</span>'))
-  assert.ok(parked.includes('data-params="{&quot;host&quot;:&quot;mac&quot;,&quot;account&quot;:&quot;b&quot;}"') && parked.includes('>Swap + Model reset</button>'))
+  assert.ok(parked.includes('data-params="{&quot;host&quot;:&quot;mac&quot;,&quot;account&quot;:&quot;b&quot;}"') && parked.includes('>Model reset</button>'))
 })
 
 test('the dial and clock rows give the active account the resets on no note, without the label, and a parked one none', () => {
@@ -334,7 +335,7 @@ test('the dial and clock rows give the active account the resets on no note, wit
   const parked = rows.find((r) => r.includes('<span class="row-name">b</span>'))
   assert.ok(active.includes('<span class="row-label">active</span>'))
   assert.ok(active.includes('data-command="limit-reset-model"') && active.includes('data-command="limit-reset-full"'))
-  assert.ok(active.includes('not known whether a reset is available'))
+  assert.ok(active.includes('if claude.ai offers one'))
   assert.equal(parked.includes('act-reset'), false)
 })
 

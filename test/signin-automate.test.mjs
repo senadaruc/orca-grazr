@@ -2,13 +2,13 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { RELAY_POLL_MS } from '../lib/signin.mjs'
 import { ACTION_CAP, RESTART_CAP } from '../lib/signin-page.mjs'
-import { CALLBACK, NOW, ORCA, URL, WORKSPACE, argAfter, assertCleaned, callsWith, harness, json, openRemoteTab, until } from './support/signin-harness.mjs'
+import { CALLBACK, ENROLLED, NOW, ORCA, URL, WORKSPACE, argAfter, assertCleaned, callsWith, harness, json, openOrganizationTab, openRemoteTab, statusReply, until } from './support/signin-harness.mjs'
 
-const ACCOUNT = 'a@b.io'
+const ACCOUNT = 'a@example.com'
 const ORIGIN = 'https://claude.ai/login?email=a%40b.io&selectAccount=true'
 const EMAIL_EMPTY = 'textbox "Email" [required, ref=e8]:\nbutton "Continue with email" [ref=e10]\nbutton "Continue with Google" [ref=e12]'
-const EMAIL_FILLED = 'textbox "Email" [required, ref=e8]: a@b.io\nbutton "Continue with email" [ref=e10]'
-const LINK_SENT = 'text: To continue, click the link sent to a@b.io\nbutton "Enter verification code" [ref=e11]'
+const EMAIL_FILLED = 'textbox "Email" [required, ref=e8]: a@example.com\nbutton "Continue with email" [ref=e10]'
+const LINK_SENT = 'text: To continue, click the link sent to a@example.com\nbutton "Enter verification code" [ref=e11]'
 const CODE_BOX = 'textbox "Login code" [ref=e14]:\nbutton "Verify email address" [ref=e15]'
 const CONSENT = 'heading "Claude Code" [level=1, ref=e3]\nbutton "Cancel" [ref=e19]\nbutton "Authorize" [ref=e20]'
 const CONSENT_URL = 'https://claude.com/cai/oauth/authorize?code=1&state=s'
@@ -98,7 +98,7 @@ test('a re-authentication walks the whole sign-in: fill the e-mail, Continue, op
   assert.equal(h.published.length, 1, 'the code toast comes once')
   assert.deepEqual(h.published[0], {
     title: 'devbox: sign-in needs the login code',
-    body: "Enter the login code from the e-mail to a@b.io in Orca's tab. Open the e-mail link on another device (e.g. your phone), not on this Mac.",
+    body: "Enter the login code from the e-mail to a@example.com in Orca's tab. Open the e-mail link on another device (e.g. your phone), not on this Mac.",
   })
 
   page.url = CALLBACK
@@ -237,5 +237,33 @@ test('every step runs on this Mac through the Orca CLI, in the tab the sign-in o
   const steps = h.calls.filter((c) => c.line.includes('snapshot --page') || c.line.includes('fill --page'))
   assert.ok(steps.length >= 3)
   assert.ok(steps.every((c) => c.bin === ORCA && argAfter(c, '--page') === 'page-1' && !c.args.includes('--environment')))
+  await finish(h, login)
+})
+
+test("a further organization's re-authentication fills its login's e-mail, never its account name, and the code toast names the e-mail", async () => {
+  const beta = { id: 'ua.ob', name: 'a@example.com:beta', email: 'a@example.com', login: 'ua', organization_uuid: 'ob' }
+  const { h } = signinAt(ORIGIN, { overrides: { 'status --json': () => statusReply([...ENROLLED, beta]) } })
+  const login = await start(h, 'a@example.com:beta')
+  h.screen.snapshot = EMAIL_EMPTY
+  await poll(h)
+  assert.equal(argAfter(fills(h)[0], '--value'), 'a@example.com')
+  h.screen.snapshot = CODE_BOX
+  await poll(h)
+  assert.match(h.published[0].body, /^Enter the login code from the e-mail to a@example\.com in Orca's tab\./)
+  await finish(h, login)
+})
+
+test('another organization fills the e-mail of its login too, and leaves the consent page, where the organization is picked, to the user', async () => {
+  const { h, page } = signinAt(ORIGIN)
+  const login = await openOrganizationTab(h)
+  await settle(h)
+  h.screen.snapshot = EMAIL_EMPTY
+  await poll(h)
+  assert.equal(argAfter(fills(h)[0], '--value'), 'a@example.com')
+  page.url = CONSENT_URL
+  h.screen.snapshot = CONSENT
+  await poll(h)
+  await poll(h)
+  assert.equal(clicks(h).length, 0, 'Authorize is never clicked for the user')
   await finish(h, login)
 })

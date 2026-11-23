@@ -130,3 +130,38 @@ test('stop clears the armed check', () => {
   s.schedule.stop()
   assert.deepEqual(s.timers.armed, [])
 })
+
+test('work run exclusive never runs beside a read: it waits for the read under way, and a read asked for meanwhile waits for it', async () => {
+  const order = []
+  let finishRead
+  let finishWork
+  const s = setup({
+    read: async ({ previous }) => {
+      order.push('read start')
+      await new Promise((resolve) => { finishRead = resolve })
+      order.push('read end')
+      return previous
+    },
+  })
+  const first = s.schedule.run()
+  await new Promise((resolve) => setImmediate(resolve))
+  const work = s.schedule.exclusive(async () => {
+    order.push('work start')
+    await new Promise((resolve) => { finishWork = resolve })
+    order.push('work end')
+  })
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(order, ['read start'])
+  finishRead()
+  await first
+  for (let i = 0; i < 5 && !finishWork; i++) await new Promise((resolve) => setImmediate(resolve))
+  const second = s.schedule.run()
+  for (let i = 0; i < 5; i++) await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(order, ['read start', 'read end', 'work start'])
+  finishWork()
+  await work
+  for (let i = 0; i < 5 && order.length < 5; i++) await new Promise((resolve) => setImmediate(resolve))
+  assert.deepEqual(order.slice(0, 5), ['read start', 'read end', 'work start', 'work end', 'read start'])
+  finishRead()
+  await second
+})

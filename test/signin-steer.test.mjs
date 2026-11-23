@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { LOGIN_TIMEOUT_MS, offTheFlow, REMOTE_LOGIN_TIMEOUT_S, RELAY_POLL_MS, STEER_GAP_MS, STEER_MAX } from '../lib/signin.mjs'
-import { D1, DEV, NOW, SETTINGS, URL, WORKSPACE, argAfter, assertCleaned, callsWith, harness, json, openRemoteTab, until } from './support/signin-harness.mjs'
+import { D1, DEV, NOW, SETTINGS, URL, WORKSPACE, argAfter, assertCleaned, callsWith, harness, json, openOrganizationTab, openRemoteTab, until } from './support/signin-harness.mjs'
 
 // One poll of the tab's address: waits for the poll to be armed, fires it, and lets its answer (and any steer) land.
 async function tick(h) {
@@ -200,4 +200,16 @@ test('the window is 30 minutes: the remote login is wrapped in timeout 1830 and 
   h.spawns[0].child.exit(null, '', 'SIGTERM')
   await until(() => h.refreshes === 1)
   assert.equal(h.published[0].title, 'devbox: sign-in timed out')
+})
+
+test('a second click for another organization of the same login switches to its open sign-in; a re-authentication of that login is a new one', async () => {
+  const { h } = tabAt()
+  const first = await openOrganizationTab(h, 'a@example.com')
+  assert.deepEqual(await h.jobs.start({ host: DEV, settings: SETTINGS, email: 'A@example.com', organization: true }), { ok: true, message: 'Sign-in already open — switched to it' })
+  assert.equal(h.spawns.length, 1)
+  const next = await h.jobs.start({ host: DEV, settings: SETTINGS, account: 'a@example.com' })
+  assert.equal(next.message, "Signing in a@example.com in Orca's browser — sign in, then approve Claude Code")
+  assert.deepEqual(first.signals, ['SIGTERM'])
+  first.exit(null, '', 'SIGTERM')
+  await until(() => h.spawns.length === 2)
 })

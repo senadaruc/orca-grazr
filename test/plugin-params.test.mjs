@@ -105,7 +105,8 @@ const waitForSpawns = async (fake, n) => {
 }
 
 test('enrol with params starts a sign-in on that host and returns at once with its message, opening no Terminal', async () => {
-  const fake = await start({ route: withTemp() })
+  const status = engine({ 'status --json': { stdout: JSON.stringify(report({ accounts: [{ name: 'x@y', id: 'x1', email: 'x@y', snapshot: [] }] })) } })
+  const fake = await start({ route: withTemp(status) })
   const outcome = await call(fake, 'enrol', { host: 'devbox', account: 'x@y' })
   assert.deepEqual(outcome, { ok: true, message: "Signing in x@y in Orca's browser — sign in, then approve Claude Code" })
   assert.equal(fake.execs.some((a) => a[0] === '/usr/bin/open'), false)
@@ -161,4 +162,62 @@ test('swap with an empty account string runs a plain swap', async () => {
   const fake = await start({ route: engine({ swap: { stdout: 'swapped\n' } }) })
   await call(fake, 'swap', { host: 'mac', account: '' })
   assert.ok(fake.execs.some((a) => label(a) === 'swap' && a[0] === 'python3'))
+})
+
+// One login with an enrolled account on an engine that keeps the organizations of a login apart.
+const loginReport = (version = '0.4.7+fork.16') => report({
+  version,
+  active: { name: 'work', id: 'a1', email: 'w@example.com' },
+  accounts: [{ name: 'work', id: 'a1', email: 'w@example.com', login: 'u1', organization_uuid: 'o1', snapshot: [] }],
+})
+
+test('sign-in-organization from the panel signs in another organization of the e-mail named, logging in with that e-mail', async () => {
+  const fake = await start({ route: withTemp(engine({ 'status --json': { stdout: JSON.stringify(loginReport()) } })) })
+  const outcome = await call(fake, 'sign-in-organization', { host: 'devbox', email: 'w@example.com' })
+  assert.deepEqual(outcome, { ok: true, message: "Signing in another organization of w@example.com in Orca's browser — sign in, pick the organization, then approve Claude Code" })
+  await waitForSpawns(fake, 1)
+  assert.equal(fake.spawns[0].args.at(-2), 'devbox')
+  assert.match(fake.spawns[0].args.at(-1), /claude auth login --email w@example\.com'$/)
+})
+
+test('sign-in-organization from the palette takes the active login of the server, and toasts', async () => {
+  const fake = await start({ route: withTemp(engine({ 'status --json': { stdout: JSON.stringify(loginReport()) } })) })
+  const outcome = await call(fake, 'sign-in-organization', undefined)
+  assert.equal(outcome.ok, true)
+  assert.match(outcome.message, /Signing in another organization of w@example\.com/)
+  assert.ok(fake.calls.some((c) => c.name === 'notifications.show' && c.params.title.endsWith('sign-in')))
+  await waitForSpawns(fake, 1)
+  assert.equal(fake.spawns.length, 1)
+})
+
+test('sign-in-organization against an engine before fork.16 is refused before anything runs: the engine must be updated first', async () => {
+  const fake = await start({ route: withTemp(engine({ 'status --json': { stdout: JSON.stringify(loginReport('0.4.7+fork.15')) } })) })
+  const outcome = await call(fake, 'sign-in-organization', { host: 'devbox', email: 'w@example.com' })
+  assert.deepEqual(outcome, { ok: false, message: 'Another organization needs engine 0.4.7+fork.16 or later: update the engine on devbox first' })
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(fake.spawns.length, 0)
+  assert.equal(fake.execs.some((a) => a.at(-1) === 'mktemp -d'), false)
+})
+
+const ACME = '22222222-2222-4222-8222-222222222222'
+const storedOrganizations = () => ({ organizations: { 'w@example.com': { readAt: 1, state: 'ok', orgs: [
+  { uuid: ACME, name: 'Acme', label: 'Acme', plan: 'Team', claudeCode: true, reason: null, kind: 'subscription' },
+  { uuid: '33333333-3333-4333-8333-333333333333', name: 'Acme API', label: 'Acme API', plan: 'API', claudeCode: false, reason: 'API console organization — not a Claude subscription', kind: 'api' },
+] } } })
+
+test('a Sign in on a discovered organization targets the organization stored for that login', async () => {
+  const fake = await start({ storage: storedOrganizations(), route: withTemp(engine({ 'status --json': { stdout: JSON.stringify(loginReport()) } })) })
+  const outcome = await call(fake, 'sign-in-organization', { host: 'devbox', email: 'W@example.com', organization: ACME })
+  assert.deepEqual(outcome, { ok: true, message: "Signing in Acme of w@example.com in Orca's browser — sign in, check the organization is Acme, then approve Claude Code" })
+  await waitForSpawns(fake, 1)
+})
+
+test('a Sign in naming an organization not stored for that login, or one without Claude Code, starts nothing', async () => {
+  const fake = await start({ storage: storedOrganizations(), route: withTemp(engine({ 'status --json': { stdout: JSON.stringify(loginReport()) } })) })
+  const refused = { ok: false, message: 'devbox: sign-in failed\nThat organization is not one Grazr found for this login on claude.ai; refresh the panel' }
+  assert.deepEqual(await call(fake, 'sign-in-organization', { host: 'devbox', email: 'w@example.com', organization: '44444444-4444-4444-8444-444444444444' }), refused)
+  assert.deepEqual(await call(fake, 'sign-in-organization', { host: 'devbox', email: 'w@example.com', organization: '33333333-3333-4333-8333-333333333333' }), refused)
+  assert.deepEqual(await call(fake, 'sign-in-organization', { host: 'devbox', email: 'other@example.com', organization: ACME }), refused)
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(fake.spawns.length, 0)
 })

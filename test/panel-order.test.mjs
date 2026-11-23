@@ -1,8 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildPanelData, displayAccounts, nextAccount } from '../lib/panel-data.mjs'
+import { buildPanelData, displayAccounts, groupsOf, nextAccount, rankedAccounts } from '../lib/panel-data.mjs'
 import { renderCard } from '../lib/panel.mjs'
 import { clockSvg } from '../lib/clock.mjs'
+import * as fixtures from './support/organizations-fixture.mjs'
 
 const NOW = new Date('2026-10-21T10:00:00Z')
 
@@ -89,4 +90,56 @@ test('rows, dial, list and clock number each account by its display position; co
   assert.ok(html.includes('<span class="row-index acct-5">1</span>'))
   assert.ok(html.includes('<span class="row-index acct-1">2</span>'))
   assert.ok(clockSvg(host.clock, { now: NOW.getTime() / 1000, span: 'session', timeZone: 'UTC' }).includes('class="clock-name acct-5"'))
+})
+
+// --- the organizations of one login, grouped ---
+
+test('two organizations of one login stand together where the first ranks, in rank order, among the other logins', () => {
+  const r = fixtures.shared()
+  assert.deepEqual(names(displayAccounts(r, NOW)), ['t@example.com', 's@example.com', 's@example.com:acme', 'u@example.com', 'v@example.com'])
+  assert.deepEqual(groupsOf(displayAccounts(r, NOW)), [
+    { key: 'login:ut', label: 't@example.com', email: 't@example.com', start: 0, size: 1 },
+    { key: 'login:us', label: 's@example.com', email: 's@example.com', start: 1, size: 2 },
+    { key: 'login:uu', label: 'u@example.com', email: 'u@example.com', start: 3, size: 1 },
+    { key: 'login:uv', label: 'v@example.com', email: 'v@example.com', start: 4, size: 1 },
+  ])
+  assert.equal(nextAccount(r, NOW).name, 's@example.com', 'the rotation is not grouped')
+})
+
+test('a group that holds the active account comes first, the active account first within it', () => {
+  const r = fixtures.shared()
+  r.active = { id: 's@example.com:acme', name: 's@example.com:acme' }
+  r.accounts.find((a) => a.name === 's@example.com:acme').parked = false
+  r.accounts.find((a) => a.name === 't@example.com').parked = true
+  assert.deepEqual(names(displayAccounts(r, NOW)), ['s@example.com:acme', 's@example.com', 't@example.com', 'u@example.com', 'v@example.com'])
+})
+
+test('a report from an engine before fork.16 has no login: its accounts group by the e-mail, case aside', () => {
+  const r = fixtures.shared()
+  r.version = '0.4.7+fork.15'
+  for (const a of r.accounts) {
+    delete a.login
+    delete a.organization_uuid
+  }
+  r.accounts.find((a) => a.name === 's@example.com:acme').email = 'S@EXAMPLE.com'
+  assert.deepEqual(names(displayAccounts(r, NOW)), ['t@example.com', 's@example.com', 's@example.com:acme', 'u@example.com', 'v@example.com'])
+  assert.equal(groupsOf(displayAccounts(r, NOW))[1].key, 'email:s@example.com')
+})
+
+test('with one account per login the shown order is the ranking itself', () => {
+  for (const r of [report(), fixtures.singles()]) {
+    assert.deepEqual(names(displayAccounts(r, NOW)), names(rankedAccounts(r, NOW)))
+    assert.ok(groupsOf(displayAccounts(r, NOW)).every((g) => g.size === 1))
+  }
+})
+
+test('discovered organizations close their login group, or open one of their own at the end', () => {
+  const discovered = [
+    { name: 's@example.com · Beta', email: 's@example.com', login: 'us', organization: 'Beta', claudeCode: false, reason: 'no Claude Code on this plan' },
+    { name: 'w@example.com · Home', email: 'w@example.com', login: 'uw', organization: 'Home' },
+  ]
+  const shown = displayAccounts(fixtures.shared(), NOW, discovered)
+  assert.deepEqual(names(shown), ['t@example.com', 's@example.com', 's@example.com:acme', 's@example.com · Beta', 'u@example.com', 'v@example.com', 'w@example.com · Home'])
+  assert.equal(shown[3].discovered, true)
+  assert.deepEqual(groupsOf(shown).map((g) => [g.label, g.size]), [['t@example.com', 1], ['s@example.com', 3], ['u@example.com', 1], ['v@example.com', 1], ['w@example.com', 1]])
 })

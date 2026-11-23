@@ -4,8 +4,8 @@ These files are a copy of the grazr engine. Edit the engine in its own repositor
 
 - Source: https://github.com/senadaruc/herdr-grazr
 - Branch: `orca-port`
-- Commit: `c3722bbda3330b8a949d0c387e2627d6b8c1f920`
-- Engine version: `0.4.7+fork.15`
+- Commit: `3cd529339e8494b438d47d1abcec5013e718ac4e`
+- Engine version: `0.4.7+fork.16`
 - Upstream: https://github.com/wazum/herdr-grazr (MIT, Wolfgang Klinger)
 
 Vendored files: `grazr.py`, `claude.py`, `core.py`, `accounts.py`, `stores.py`, `atomic.py`, `pins.py`, `shim.py`, `LICENSE`.
@@ -14,7 +14,7 @@ Vendored files: `grazr.py`, `claude.py`, `core.py`, `accounts.py`, `stores.py`, 
 
 ```sh
 ENGINE_REPO=/path/to/herdr-grazr
-PLUGIN_REPO=/path/to/orca-account-autoswitch
+PLUGIN_REPO=/path/to/orca-grazr
 COMMIT=$(git -C "$ENGINE_REPO" rev-parse HEAD)
 for f in grazr.py claude.py core.py accounts.py stores.py atomic.py pins.py shim.py LICENSE; do
   git -C "$ENGINE_REPO" show "$COMMIT:$f" > "$PLUGIN_REPO/engine/$f"

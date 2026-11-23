@@ -4,6 +4,33 @@ All notable changes to this plugin are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 0.11.0 - 2026-11-23
+
+Summarises 0.9.12 through 0.11.0. Needs the same Orca as 0.9.11. The bundled engine is `0.4.7+fork.16`: run `Grazr: Install engine on target` on each host.
+
+### Added
+
+- Several organizations of one login. Engine `0.4.7+fork.16` makes an account a login plus its organization: enrolling a second organization of a login no longer overwrites the first one's credential, the first one keeps its id and name, and each further one is enrolled as `<email>:<organization>`. `status --json` now reports each account's `login` and `organization_uuid`, and `enrol` takes `--expect-organization`.
+- The panel groups the organizations of one login under a header with its e-mail, and names each by its organization and plan. A login with one account looks as before. Rotation is not grouped.
+- Organizations are discovered automatically: those claude.ai lists for a login that are not enrolled close the login's group on each card, one that can run Claude Code as not signed in with `Sign in…`, and free and API console organizations greyed out with the reason.
+- `Sign in another organization…` on a login's group header and on the List card of a login with one account, and as `Grazr: Sign in another organization of the active login (this workspace's server)`. It signs in with the login's e-mail in its browser profile and leaves the organization to claude.ai's consent page. `Sign in…` on a discovered organization also asks claude.ai for that organization (`orgUUID`). An organization already enrolled is refused, a new one joins the end of the rotation order, and a host with an older engine is refused (`update the engine on <host> first`).
+
+### Changed
+
+- The reset buttons use the reset on claude.ai in one press instead of typing `claude '/limit-reset …'` into a terminal. Grazr opens the account's Usage page in a background tab of its browser profile, clicks `Reset for free` in the row of that kind, answers a confirmation dialog when it has exactly one confirming button, and closes the tab. It reports success only when one fewer of that kind is counted afterwards. claude.ai greys the button out in a background tab, so Grazr tells the page, in its own tab only, that it has focus and waits up to 10 s for the button; a button still greyed out is never clicked.
+- Reset buttons never swap. On a parked account they read as on the active one (`Fable reset`, `Full reset`) and use that account's reset where it stays parked; `Switch` or `Swap to` moves to it. The host's usage is refreshed afterwards.
+- The palette's reset commands are `Grazr: Use a model limit reset on claude.ai (active account of this workspace's server)` and `Grazr: Use a full limit reset on claude.ai (active account of this workspace's server)`. They no longer need a terminal or a workspace, answer at once and report by notification.
+- Limit resets and organizations are read from claude.ai's own data instead of the Usage page's text, with GET requests only, per organization: each account gets only its own organization's grants. A kind claude.ai counts but does not let be used now shows greyed out with claude.ai's reason. One tab per login. When the data cannot be read, a login with one account and at most one subscription organization falls back to the page's text.
+- A reset for an organization that claude.ai does not have selected first selects it (the `lastActiveOrg` cookie), reloads the page and checks the page now shows that organization before clicking; the previous selection is put back afterwards.
+- One browser profile per login: profiles are stored under the login's e-mail as well as the account name, and a new one is labelled `grazr · <email>`. Existing profiles are still found.
+- A sign-in keeps the e-mail and the account name apart, and a re-authentication reads the account's e-mail and organization from a fresh status and checks both.
+- Stored readings gain `organizationUuid` and `source`, and each login's organizations are stored under `organizations`.
+
+### Notes
+
+- No new capability is declared. The resets, organizations and browser profiles are driven through the `orca` CLI.
+- Verified read-only against a live claude.ai page: the organization list, the selected organization's cookie, a Team organization's grants, and the reset buttons greyed out in a background tab and enabled after the focus event. Not yet verified live: spending a reset, selecting an organization by its cookie, and whether claude.ai's authorize page honours `orgUUID`.
+
 ## 0.9.11 - 2026-11-23
 
 Summarises 0.9.0 through 0.9.11. Needs the same Orca as 0.8.1; the in-place panel updates need 1.4.246 or later. The bundled engine is `0.4.7+fork.15`: run `Grazr: Install engine on target` on each host.

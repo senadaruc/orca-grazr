@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { loginHostFor, clip, LINE_MAX, LOGIN_TIMEOUT_MS, URL_TIMEOUT_MS } from '../lib/signin.mjs'
 import { fixtureSettings } from './support/fixture-hosts.mjs'
-import { D1, D2, DEV, EXPORT_LINE, MAC, OK_ENROL, ORCA, SETTINGS, SSH, STAMP, URL, WORKSPACE, argAfter, assertCleaned, callsWith, closesOf, deletesOf, discardsOf, harness, json, openRemoteTab, until, LABEL } from './support/signin-harness.mjs'
+import { D1, D2, DEV, ENROLLED, EXPORT_LINE, MAC, OK_ENROL, ORCA, SETTINGS, SSH, STAMP, URL, WORKSPACE, argAfter, assertCleaned, callsWith, closesOf, deletesOf, discardsOf, exportOf, harness, json, openOrganizationTab, openRemoteTab, statusReply, until, LABEL } from './support/signin-harness.mjs'
 
 test('a remote card signs in on its own host: the login runs there in a throwaway dir, opens in that environment, enrols there and is discarded', async () => {
   const h = harness()
@@ -38,7 +38,7 @@ test('a remote card signs in on its own host: the login runs there in a throwawa
   assert.deepEqual(h.store.browserProfiles, { 'a@example.com': 'p1' })
 })
 
-test('a re-authentication passes the account as --email, labels its profile by the account, and enrols with --expect-email', async () => {
+test('a re-authentication passes the e-mail from the status as --email, uses the login profile, and enrols expecting its e-mail and organization', async () => {
   const h = harness()
   h.profiles.push({ id: 'prof-7', label: 'grazr · a@example.com' })
   const login = await openRemoteTab(h, 'a@example.com')
@@ -48,7 +48,7 @@ test('a re-authentication passes the account as --email, labels its profile by t
   assert.equal(argAfter(callsWith(h, 'tab create')[0], '--profile'), 'prof-7')
   login.exit(0)
   await until(() => h.refreshes === 1)
-  assert.match(callsWith(h, 'enrol --from')[0].line, new RegExp(`enrol --from ${D1} --name a@example\\.com --expect-email a@example\\.com --json$`))
+  assert.match(callsWith(h, 'enrol --from')[0].line, new RegExp(`enrol --from ${D1} --name a@example\\.com --expect-email a@example\\.com --expect-organization oa --json$`))
   assert.equal(callsWith(h, 'login-export').length, 0, 'an account named by the card needs no export read')
   assert.equal(h.published[0].title, 'devbox: signed in')
 })
@@ -67,7 +67,7 @@ test('a Mac card signs in on the first remote host with an environment, and the 
   assert.equal(stdin.length, 1)
   assert.equal(stdin[0].where, 'local', 'the Mac engine enrols')
   assert.equal(stdin[0].input, EXPORT_LINE)
-  assert.match(stdin[0].line, /enrol --stdin --name x@example\.com --expect-email x@example\.com --json$/)
+  assert.match(stdin[0].line, /enrol --stdin --name x@example\.com --expect-email x@example\.com --expect-organization ox --json$/)
   assert.equal(callsWith(h, 'enrol --from').length, 0)
   assert.equal(h.published[0].title, 'mac: signed in')
   assertCleaned(h, { dir: D1, page: 'page-1' })
@@ -308,4 +308,173 @@ test('clip cuts a line to LINE_MAX characters with an ellipsis and leaves short 
   assert.equal(cut.length, LINE_MAX)
   assert.ok(cut.endsWith('…'))
   assert.equal(clip(undefined), '')
+})
+
+// --- e-mail and account name kept apart, and another organization of a login ---
+
+// a@example.com with a second organization enrolled under a name of its own.
+const TWO_ORGS = [...ENROLLED, { id: 'ua.ob', name: 'a@example.com:beta', email: 'a@example.com', login: 'ua', organization_uuid: 'ob', organization: 'Beta' }]
+const enrolReply = (name, organization) => ({ stdout: `${JSON.stringify({ ok: true, name, email: 'a@example.com', organization, unblocked: true, ordered: true })}\n` })
+
+test('a re-authentication of a further organization logs in with the e-mail of its login and enrols under its own name, expecting its organization', async () => {
+  const h = harness({ overrides: { 'status --json': () => statusReply(TWO_ORGS), 'enrol --from': () => enrolReply('a@example.com:beta', 'Beta') } })
+  h.profiles.push({ id: 'prof-a', label: 'grazr · a@example.com' })
+  const started = await h.jobs.start({ host: DEV, settings: SETTINGS, account: 'a@example.com:beta' })
+  assert.deepEqual(started, { ok: true, message: "Signing in a@example.com:beta in Orca's browser — sign in, then approve Claude Code" })
+  await until(() => h.spawns.length === 1)
+  assert.match(h.spawns[0].args.at(-1), /claude auth login --email a@example\.com'$/, 'the login is the e-mail, never the name')
+  h.spawns[0].child.emitUrl()
+  await until(() => callsWith(h, 'tab create').length === 1)
+  assert.equal(argAfter(callsWith(h, 'tab create')[0], '--profile'), 'prof-a', "the login's profile")
+  h.spawns[0].child.exit(0)
+  await until(() => h.refreshes === 1)
+  assert.match(callsWith(h, 'enrol --from')[0].line, new RegExp(`enrol --from ${D1} --name a@example\\.com:beta --expect-email a@example\\.com --expect-organization ob --json$`))
+  assert.equal(h.published[0].body, 'Enrolled a@example.com:beta (Beta) on devbox\nAdded to the end of the rotation order.')
+})
+
+test('a re-authentication reads the account from a fresh status: an unknown name, or a status that fails, starts nothing', async () => {
+  const unknown = harness()
+  assert.deepEqual(await unknown.jobs.start({ host: DEV, settings: SETTINGS, account: 'gone@example.com' }), { ok: false, message: 'gone@example.com is not enrolled on devbox; refresh the panel' })
+  assert.equal(unknown.spawns.length + callsWith(unknown, 'mktemp').length, 0)
+  const down = harness({ overrides: { 'status --json': () => ({ code: 255, stderr: 'ssh: connect to host devbox port 22: Connection refused\n' }) } })
+  const refused = await down.jobs.start({ host: DEV, settings: SETTINGS, account: 'a@example.com' })
+  assert.equal(refused.ok, false)
+  assert.match(refused.message, /^The accounts on devbox could not be read: /)
+  assert.equal(down.spawns.length, 0)
+})
+
+test('on an engine before fork.16 a re-authentication expects the e-mail alone, and another organization is refused before anything runs', async () => {
+  const old = ENROLLED.map(({ login, organization_uuid, ...rest }) => rest)
+  const h = harness({ overrides: { 'status --json': () => statusReply(old, '0.4.7+fork.15') } })
+  const login = await openRemoteTab(h, 'a@example.com')
+  login.exit(0)
+  await until(() => h.refreshes === 1)
+  assert.match(callsWith(h, 'enrol --from')[0].line, /--name a@example\.com --expect-email a@example\.com --json$/)
+  const spawned = h.spawns.length
+  assert.deepEqual(await h.jobs.start({ host: DEV, settings: SETTINGS, email: 'a@example.com', organization: true }), { ok: false, message: 'Another organization needs engine 0.4.7+fork.16 or later: update the engine on devbox first' })
+  assert.equal(h.spawns.length, spawned)
+})
+
+test('another organization needs an enrolled account of that e-mail on the card host', async () => {
+  const h = harness()
+  assert.deepEqual(await h.jobs.start({ host: DEV, settings: SETTINGS, email: 'nobody@example.com', organization: true }), { ok: false, message: 'No account of nobody@example.com is enrolled on devbox; refresh the panel' })
+  assert.equal(h.spawns.length, 0)
+})
+
+test('another organization: the export names the organization before the name is chosen, and it is enrolled as <email>:<slug> in the login profile', async () => {
+  const h = harness({ overrides: { 'login-export': () => exportOf({ organization: 'oc', organizationName: 'Gamma & Co' }), 'enrol --from': () => enrolReply('a@example.com:gamma-co', 'Gamma & Co') } })
+  h.profiles.push({ id: 'prof-a', label: 'grazr · a@example.com' })
+  const login = await openOrganizationTab(h)
+  assert.match(h.spawns[0].args.at(-1), /claude auth login --email a@example\.com'$/)
+  assert.equal(argAfter(callsWith(h, 'tab create')[0], '--profile'), 'prof-a')
+  login.exit(0)
+  await until(() => h.refreshes === 1)
+  const order = h.calls.map((c) => c.line).filter((l) => /login-export|status --json|enrol --from/.test(l)).map((l) => l.match(/login-export|status --json|enrol --from/)[0])
+  assert.deepEqual(order, ['status --json', 'login-export', 'status --json', 'enrol --from'], 'export, then a fresh status, then the enrolment')
+  assert.match(callsWith(h, 'enrol --from')[0].line, new RegExp(`enrol --from ${D1} --name a@example\\.com:gamma-co --expect-email a@example\\.com --expect-organization oc --json$`))
+  assert.equal(h.published[0].body, 'Enrolled a@example.com:gamma-co (Gamma & Co) on devbox\nAdded to the end of the rotation order.')
+  assert.deepEqual(h.store.browserProfiles, { 'a@example.com': 'prof-a', 'a@example.com:gamma-co': 'prof-a' }, "the new account shares the login's profile")
+  assert.equal(deletesOf(h).length, 0)
+  assertCleaned(h, { dir: D1, page: 'page-1' })
+})
+
+test('another organization that is enrolled already is not enrolled twice: the sign-in says so and is cleaned up', async () => {
+  const h = harness({ overrides: { 'status --json': () => statusReply(TWO_ORGS), 'login-export': () => exportOf({ organization: 'OB', organizationName: 'Beta' }) } })
+  const login = await openOrganizationTab(h)
+  login.exit(0)
+  await until(() => h.refreshes === 1)
+  assert.equal(callsWith(h, 'enrol').length, 0, 'nothing is enrolled')
+  assert.deepEqual(h.published.map((t) => [t.title, t.body]), [['devbox: sign-in failed', 'that organization is already enrolled — choose the other one on claude.ai (a@example.com:beta)\nNothing was enrolled.']])
+  assertCleaned(h, { dir: D1, page: 'page-1' })
+  assert.equal(deletesOf(h).length, 0, "the login's own profile is kept")
+})
+
+test('another organization whose slug is taken gets the next free suffix', async () => {
+  const taken = [...ENROLLED, { id: 'ux2', name: 'a@example.com:beta', email: 'other@example.com', login: 'uo', organization_uuid: 'oo' }]
+  const h = harness({ overrides: { 'status --json': () => statusReply(taken), 'login-export': () => exportOf({ organization: 'ob', organizationName: 'Beta' }) } })
+  const login = await openOrganizationTab(h)
+  login.exit(0)
+  await until(() => h.refreshes === 1)
+  assert.match(callsWith(h, 'enrol --from')[0].line, /--name a@example\.com:beta-2 --expect-email a@example\.com --expect-organization ob --json$/)
+})
+
+test('another organization signed in under another e-mail is refused, and nothing is enrolled', async () => {
+  const h = harness({ overrides: { 'login-export': () => exportOf({ email: 'x@example.com', login: 'ux', organization: 'oz', organizationName: 'Z' }) } })
+  const login = await openOrganizationTab(h)
+  login.exit(0)
+  await until(() => h.refreshes === 1)
+  assert.equal(callsWith(h, 'enrol').length, 0)
+  assert.equal(h.published[0].body, 'signed in as x@example.com, expected a@example.com\nNothing was enrolled.')
+})
+
+test('on a Mac card another organization is read from the export on the login host and piped to the Mac engine', async () => {
+  const h = harness({ overrides: { 'login-export': () => exportOf({ organization: 'oc', organizationName: 'Gamma' }) } })
+  const login = await openOrganizationTab(h, 'A@EXAMPLE.com', MAC)
+  login.exit(0)
+  await until(() => h.refreshes === 1)
+  const stdin = callsWith(h, 'enrol --stdin')
+  assert.equal(stdin[0].where, 'local')
+  assert.match(stdin[0].line, /enrol --stdin --name a@example\.com:gamma --expect-email a@example\.com --expect-organization oc --json$/)
+  assert.equal(stdin[0].input, exportOf({ organization: 'oc', organizationName: 'Gamma' }).stdout)
+  assert.equal(callsWith(h, 'status --json').every((c) => c.where === 'local'), true, "the Mac card's accounts are the Mac's")
+})
+
+test('Add account for a login whose other organization is enrolled names the new one <email>:<slug> instead of failing on the e-mail', async () => {
+  const h = harness({ overrides: { 'login-export': () => exportOf({ organization: 'ob', organizationName: 'Beta' }) } })
+  const login = await openRemoteTab(h, null)
+  login.exit(0)
+  await until(() => h.refreshes === 1)
+  assert.match(callsWith(h, 'enrol --from')[0].line, new RegExp(`enrol --from ${D1} --name a@example\\.com:beta --json$`))
+})
+
+test('Add account for a login and organization enrolled already renews it under its own name', async () => {
+  const h = harness({ overrides: { 'status --json': () => statusReply(TWO_ORGS), 'login-export': () => exportOf({ organization: 'ob', organizationName: 'Beta' }) } })
+  const login = await openRemoteTab(h, null)
+  login.exit(0)
+  await until(() => h.refreshes === 1)
+  assert.match(callsWith(h, 'enrol --from')[0].line, /--name a@example\.com:beta --json$/)
+})
+
+test('withOrganization appends orgUUID to the authorize address and keeps the rest as Claude printed it', async () => {
+  const { withOrganization } = await import('../lib/signin.mjs')
+  const uuid = '22222222-2222-4222-8222-222222222222'
+  const url = 'https://claude.ai/oauth/authorize?code=true&client_id=c&scope=org%3Acreate_api_key+user%3Aprofile&state=s%2Bt'
+  assert.equal(withOrganization(url, uuid), `${url}&orgUUID=${uuid}`)
+  assert.equal(withOrganization(`${url}#x`, uuid), `${url}&orgUUID=${uuid}#x`)
+  assert.equal(withOrganization('https://claude.ai/oauth/authorize', uuid), `https://claude.ai/oauth/authorize?orgUUID=${uuid}`)
+  assert.equal(withOrganization(`${url}&orgUUID=${uuid}`, '33333333-3333-4333-8333-333333333333'), `${url}&orgUUID=${uuid}`, 'one already there stays')
+  assert.equal(withOrganization(url, 'not-a-uuid&state=x'), url)
+  assert.equal(new globalThis.URL(withOrganization(url, uuid)).searchParams.get('state'), 's+t')
+})
+
+const TARGET = { uuid: '22222222-2222-4222-8222-222222222222', name: 'Acme' }
+
+async function openTargetedTab(h) {
+  const started = await h.jobs.start({ host: DEV, settings: SETTINGS, email: 'a@example.com', organization: true, target: TARGET })
+  assert.equal(started.ok, true, started.message)
+  assert.equal(started.message, "Signing in Acme of a@example.com in Orca's browser — sign in, check the organization is Acme, then approve Claude Code")
+  await until(() => h.spawns.length === 1)
+  const login = h.spawns[0].child
+  login.emitPid()
+  login.emitUrl()
+  await until(() => callsWith(h, 'tab create').length === 1)
+  return login
+}
+
+test('a sign-in targeted at an organization asks claude.ai for it with orgUUID and enrols expecting it', async () => {
+  const h = harness({ overrides: { 'login-export': () => exportOf({ organization: TARGET.uuid, organizationName: 'Acme' }), 'enrol --from': () => enrolReply('a@example.com:acme', 'Acme') } })
+  const login = await openTargetedTab(h)
+  assert.equal(argAfter(callsWith(h, 'tab create')[0], '--url'), `${URL}&orgUUID=${TARGET.uuid}`)
+  login.exit(0)
+  await until(() => h.refreshes === 1)
+  assert.match(callsWith(h, 'enrol --from')[0].line, new RegExp(`--name a@example\\.com:acme --expect-email a@example\\.com --expect-organization ${TARGET.uuid} --json$`))
+})
+
+test('a sign-in targeted at an organization that came back with another one is refused, and says which to pick', async () => {
+  const h = harness({ overrides: { 'login-export': () => exportOf({ organization: 'oc', organizationName: 'Gamma' }) } })
+  const login = await openTargetedTab(h)
+  login.exit(0)
+  await until(() => h.refreshes === 1)
+  assert.equal(callsWith(h, 'enrol').length, 0)
+  assert.equal(h.published[0].body, 'claude.ai signed in to Gamma, not Acme — pick Acme on the authorize page\nNothing was enrolled.')
 })

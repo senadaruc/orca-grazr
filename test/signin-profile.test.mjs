@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { profileLabel } from '../lib/signin.mjs'
-import { DEV, SETTINGS, STAMP, argAfter, callsWith, deletesOf, harness, json, openRemoteTab, until, LABEL } from './support/signin-harness.mjs'
+import { DEV, ENROLLED, SETTINGS, STAMP, argAfter, callsWith, deletesOf, exportOf, harness, json, openOrganizationTab, openRemoteTab, statusReply, until, LABEL } from './support/signin-harness.mjs'
 
 test('each add-account sign-in gets a fresh profile, a label taken in the same minute gets a suffix, and a profile whose account was enrolled is kept for it', async () => {
   const h = harness()
@@ -103,4 +103,29 @@ test('a re-authentication with no profile yet creates one labelled by the accoun
   assert.equal(argAfter(callsWith(h, 'tab create').at(-1), '--profile'), 'p1')
   again.exit(0)
   await until(() => h.refreshes === 2)
+})
+
+test("another organization signs in in its login's profile, found by the e-mail, and the new name is remembered for that profile", async () => {
+  const h = harness({ overrides: { 'login-export': () => exportOf({ organization: 'ob', organizationName: 'Beta' }) } })
+  h.profiles.push({ id: 'prof-a', label: 'something else' })
+  h.store.browserProfiles = { 'a@example.com': 'prof-a' }
+  const login = await openOrganizationTab(h)
+  assert.equal(callsWith(h, 'tab profile create').length, 0, 'no profile of its own')
+  assert.equal(argAfter(callsWith(h, 'tab create')[0], '--profile'), 'prof-a')
+  login.exit(0)
+  await until(() => h.refreshes === 1)
+  assert.deepEqual(h.store.browserProfiles, { 'a@example.com': 'prof-a', 'a@example.com:beta': 'prof-a' })
+  assert.equal(deletesOf(h).length, 0)
+})
+
+test('a re-authentication of a further organization reuses the profile labelled by its login, not one by its name', async () => {
+  const beta = { id: 'ua.ob', name: 'a@example.com:beta', email: 'a@example.com', login: 'ua', organization_uuid: 'ob' }
+  const h = harness({ overrides: { 'status --json': () => statusReply([...ENROLLED, beta]) } })
+  h.profiles.push({ id: 'prof-a', label: 'grazr · a@example.com' })
+  const login = await openRemoteTab(h, 'a@example.com:beta')
+  assert.equal(callsWith(h, 'tab profile create').length, 0)
+  assert.equal(argAfter(callsWith(h, 'tab create')[0], '--profile'), 'prof-a')
+  login.exit(null, '', 'SIGTERM')
+  await until(() => h.refreshes === 1)
+  assert.deepEqual(h.store.browserProfiles, { 'a@example.com': 'prof-a', 'a@example.com:beta': 'prof-a' })
 })

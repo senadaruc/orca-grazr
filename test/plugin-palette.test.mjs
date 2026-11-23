@@ -69,7 +69,7 @@ test('reauth signs in the first blocked account in rotation order, on the focuse
   const accounts = [
     { name: 'a', id: 'a1', snapshot: [] },
     { name: 'b', id: 'b1', blocked: 'weekly limit', snapshot: [] },
-    { name: 'c', id: 'c1', blocked: 'session limit', snapshot: [] },
+    { name: 'c', id: 'c1', email: 'c@example.com', blocked: 'session limit', snapshot: [] },
   ]
   const fake = await start({ route: withTemp(withFocus(ON_DEVBOX, { 'status --json': { stdout: JSON.stringify(report({ accounts, order: ['c', 'b', 'a'] })) } })) })
   const outcome = await call(fake, 'reauth', undefined)
@@ -77,7 +77,7 @@ test('reauth signs in the first blocked account in rotation order, on the focuse
   await waitForSpawns(fake, 1)
   assert.equal(fake.spawns[0].file, '/usr/bin/ssh')
   assert.equal(fake.spawns[0].args.at(-2), 'devbox')
-  assert.ok(fake.spawns[0].args.at(-1).includes('--email c'))
+  assert.ok(fake.spawns[0].args.at(-1).includes('--email c@example.com'), 'the login is its e-mail, not its name')
   assert.ok(fake.execs.some((a) => label(a) === 'status --json' && a.includes('devbox')))
 })
 

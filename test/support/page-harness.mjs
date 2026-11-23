@@ -34,6 +34,7 @@ function makeElement(tag, doc) {
     style: {},
     doc,
     getAttribute: (name) => (node.attrs.has(name) ? node.attrs.get(name) : null),
+    hasAttribute: (name) => node.attrs.has(name),
     setAttribute: (name, value) => node.attrs.set(name, String(value)),
     removeAttribute: (name) => { node.attrs.delete(name) },
     // focus() records the element, so a test can see which tab the arrow keys moved to.

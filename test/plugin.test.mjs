@@ -10,11 +10,11 @@ import { ROOT, fakeFs, fakeTimers, engine, label, start, statusRoute, statusExec
 
 const manifest = JSON.parse(await readFile(resolve(ROOT, 'orca-plugin.json'), 'utf8'))
 
-test('registers exactly the seventeen manifest command ids and the two events', async () => {
+test('registers exactly the eighteen manifest command ids and the two events', async () => {
   const { commands, handlers, plugin } = await start()
   const ids = manifest.contributes.commands.map((c) => c.id).sort()
   assert.deepEqual([...commands.keys()].sort(), ids)
-  assert.equal(Object.keys(plugin.commands).length, 17)
+  assert.equal(Object.keys(plugin.commands).length, 18)
   assert.deepEqual([...handlers.keys()].sort(), manifest.contributes.events.map((e) => e.on).sort())
 })
 
@@ -32,7 +32,7 @@ test('every command is also a panel request handler on a host with orca.panels.h
 
 test('an older host without orca.panels still activates and registers every command', async () => {
   const { commands, panelHandlers } = await start({ noPanels: true })
-  assert.equal(commands.size, 17)
+  assert.equal(commands.size, 18)
   assert.equal(panelHandlers.size, 0)
 })
 
@@ -253,9 +253,9 @@ test('a budget expiry during deploy stops the sequence and says install may stil
   })
 })
 
-test('activation still registers all seventeen commands when settings.get rejects', async () => {
+test('activation still registers all eighteen commands when settings.get rejects', async () => {
   const fake = await start({ rejectSettingsGet: true })
-  assert.equal(fake.commands.size, 17)
+  assert.equal(fake.commands.size, 18)
   assert.equal(fake.handlers.size, 2)
   assert.ok(fake.logs.some((m) => m.includes('settings host unavailable')))
 })

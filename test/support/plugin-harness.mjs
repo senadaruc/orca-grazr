@@ -165,7 +165,7 @@ export function fakeSpawn() {
   return { spawn, spawns }
 }
 
-export async function start({ stored = null, storage = {}, context = null, route = () => ({}), timers = fakeTimers(), now = () => 1000, rejectSettingsGet = false, rejectStorageSet = false, noPanels = false, fs = fakeFs(), tmpdir = "/tmpdir", spawned = fakeSpawn() } = {}) {
+export async function start({ stored = null, storage = {}, context = null, route = () => ({}), timers = fakeTimers(), now = () => 1000, rejectSettingsGet = false, rejectStorageSet = false, noPanels = false, fs = fakeFs(), tmpdir = "/tmpdir", spawned = fakeSpawn(), sleep = async () => {} } = {}) {
   // No stored settings gets the three-host fixture; a settings file that names keys keeps them and gets the fixture hosts
   // unless it names its own; an explicit empty file ({}) stays empty, so the defaults apply.
   const withHosts = stored === null ? { hosts: FIXTURE_HOSTS } : Object.keys(stored).length ? { hosts: FIXTURE_HOSTS, ...stored } : stored
@@ -181,6 +181,7 @@ export async function start({ stored = null, storage = {}, context = null, route
     timers,
     now,
     spawn: spawned.spawn,
+    sleep,
     log: (msg) => fake.logs.push(msg),
   })
   await settle()

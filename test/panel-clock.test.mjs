@@ -3,7 +3,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { renderCard, renderPanel, placeholderPanel } from '../lib/panel.mjs'
 import { buildPanelData, clockData } from '../lib/panel-data.mjs'
-import { project } from '../lib/clock.mjs'
+import { clockSvg, project } from '../lib/clock.mjs'
+import * as organizations from './support/organizations-fixture.mjs'
 
 const NOW = new Date('2026-10-21T10:00:00Z')
 const PAGE = readFileSync(new URL('../panel/template.html', import.meta.url), 'utf8')
@@ -222,4 +223,21 @@ test('placeholderPanel also inlines the module', () => {
   assert.equal(html.split('export function project(').length - 1, 1)
   assert.equal(html.includes('/*__CLOCK__*/'), false)
   assert.equal(html.includes('/*__DATA__*/'), false)
+})
+
+test('with two organizations of one login grouped, the clock badges carry the shown row numbers and the colours the rotation slots', () => {
+  const host = buildPanelData({
+    settings: { hosts: [{ name: 'mac' }], target: 'mac' },
+    now: organizations.NOW,
+    timeZone: 'UTC',
+    hosts: [{ host: { name: 'mac' }, result: { ok: true, value: organizations.shared() } }],
+  }).hosts[0]
+  assert.deepEqual(host.views.weekly.segments.map((s) => [s.index, s.name]), host.views.weekly.rows.map((r) => [r.index, r.name]))
+  assert.deepEqual(host.clock.accounts.map((a) => [a.name, a.index, a.slot]), [
+    ['t@example.com', 1, 1], ['s@example.com', 2, 2], ['u@example.com', 4, 3], ['s@example.com:acme', 3, 4], ['v@example.com', 5, 5],
+  ])
+  // s@example.com:acme is spent until noon: its refill badge reads its row number, 3, in the colour of its slot, 4.
+  const svg = clockSvg(host.clock, { now: organizations.NOW.getTime() / 1000, span: 'session', timeZone: 'UTC' })
+  assert.match(svg, /class="clock-refill acct-4"[^>]*\/><text class="clock-refill-num"[^>]*>3<\/text>/)
+  assert.ok(renderCard({ ...host, open: true }, {}).includes('<span class="row-index acct-4">3</span><span class="row-name" title="s@example.com:acme">'))
 })

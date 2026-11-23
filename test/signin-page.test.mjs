@@ -40,53 +40,58 @@ test('parseSnapshot skips lines it cannot read and keeps elements without a ref 
 })
 
 test('a re-authentication on an empty e-mail page fills the account e-mail first, and never the code', () => {
-  const plan = planStep(parseSnapshot(EMAIL_EMPTY), { account: 'a@b.io' })
+  const plan = planStep(parseSnapshot(EMAIL_EMPTY), { email: 'a@b.io' })
   assert.deepEqual(plan, { kind: 'email', act: { id: 'fill-email', ref: 'e8' }, codeBox: false })
 })
 
+test('with approve false the consent page has no action: the user picks the organization and approves', () => {
+  assert.equal(planStep(parseSnapshot(CONSENT('Authorize')), { email: 'a@b.io', approve: false }).act, null)
+  assert.deepEqual(planStep(parseSnapshot(EMAIL_EMPTY), { email: 'a@b.io', approve: false }).act, { id: 'fill-email', ref: 'e8' })
+})
+
 test('the e-mail is compared without case or spaces: the same address is continued, another is refilled', () => {
-  assert.deepEqual(planStep(parseSnapshot(EMAIL_FILLED), { account: 'you@example.com' }).act, { id: 'continue', ref: 'e10' })
-  assert.deepEqual(planStep(parseSnapshot(EMAIL_FILLED), { account: 'other@example.com' }).act, { id: 'fill-email', ref: 'e8' })
+  assert.deepEqual(planStep(parseSnapshot(EMAIL_FILLED), { email: 'you@example.com' }).act, { id: 'continue', ref: 'e10' })
+  assert.deepEqual(planStep(parseSnapshot(EMAIL_FILLED), { email: 'other@example.com' }).act, { id: 'fill-email', ref: 'e8' })
 })
 
 test('an add-account sign-in leaves the e-mail to the user: the email page has no action at all', () => {
-  assert.deepEqual(planStep(parseSnapshot(EMAIL_EMPTY), { account: null }), { kind: 'email', act: null, codeBox: false })
-  assert.deepEqual(planStep(parseSnapshot(EMAIL_FILLED), { account: null }).act, null)
+  assert.deepEqual(planStep(parseSnapshot(EMAIL_EMPTY), { email: null }), { kind: 'email', act: null, codeBox: false })
+  assert.deepEqual(planStep(parseSnapshot(EMAIL_FILLED), { email: null }).act, null)
 })
 
 test('the link-sent page opens the code box; Google, Apple and other buttons are never acted on', () => {
-  assert.deepEqual(planStep(parseSnapshot(LINK_SENT), { account: 'a@b.io' }), { kind: 'link-sent', act: { id: 'open-code', ref: 'e11' }, codeBox: false })
+  assert.deepEqual(planStep(parseSnapshot(LINK_SENT), { email: 'a@b.io' }), { kind: 'link-sent', act: { id: 'open-code', ref: 'e11' }, codeBox: false })
   const other = parseSnapshot('button "Continue with Google" [ref=e12]\nbutton "Try Claude" [ref=e30]\nbutton "Download" [ref=e31]')
-  assert.deepEqual(planStep(other, { account: 'a@b.io' }), { kind: 'other', act: null, codeBox: false })
+  assert.deepEqual(planStep(other, { email: 'a@b.io' }), { kind: 'other', act: null, codeBox: false })
 })
 
 test('a page with the Login code box is the code step: nothing is acted on, and the box is never a fill target', () => {
   for (const account of ['a@b.io', null]) {
-    const plan = planStep(parseSnapshot(CODE_BOX), { account })
+    const plan = planStep(parseSnapshot(CODE_BOX), { email: account })
     assert.deepEqual(plan, { kind: 'code', act: null, codeBox: true })
   }
   // Even with the e-mail page's controls still visible, a code box means the code step.
-  const both = planStep(parseSnapshot(`${EMAIL_FILLED}\n${CODE_BOX}`), { account: 'a@b.io' })
+  const both = planStep(parseSnapshot(`${EMAIL_FILLED}\n${CODE_BOX}`), { email: 'a@b.io' })
   assert.equal(both.act, null)
   assert.equal(both.codeBox, true)
 })
 
 test('the consent button is Authorize, Allow or Approve in any case, and only exact names count', () => {
   for (const label of ['Authorize', 'allow', 'APPROVE']) {
-    assert.deepEqual(planStep(parseSnapshot(CONSENT(label)), { account: 'a@b.io' }).act, { id: 'approve', ref: 'e20' }, label)
+    assert.deepEqual(planStep(parseSnapshot(CONSENT(label)), { email: 'a@b.io' }).act, { id: 'approve', ref: 'e20' }, label)
   }
   for (const label of ['Authorize access', 'Deny', 'Not now']) {
-    assert.equal(planStep(parseSnapshot(CONSENT(label)), { account: 'a@b.io' }).act, null, label)
+    assert.equal(planStep(parseSnapshot(CONSENT(label)), { email: 'a@b.io' }).act, null, label)
   }
 })
 
 test('once the consent is clicked, the consent page has no further action', () => {
-  const plan = planStep(parseSnapshot(CONSENT('Authorize')), { account: 'a@b.io', consented: true })
+  const plan = planStep(parseSnapshot(CONSENT('Authorize')), { email: 'a@b.io', consented: true })
   assert.deepEqual(plan, { kind: 'consent', act: null, codeBox: false })
 })
 
 test('an element with no ref is seen but gives no action', () => {
-  assert.equal(planStep(parseSnapshot('textbox "Email"\nbutton "Continue with email"'), { account: 'a@b.io' }).act, null)
+  assert.equal(planStep(parseSnapshot('textbox "Email"\nbutton "Continue with email"'), { email: 'a@b.io' }).act, null)
 })
 
 test('isMagicLink matches the magic-link page and its sub-pages only', () => {

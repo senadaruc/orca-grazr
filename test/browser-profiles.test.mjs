@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { createAccountProfiles, onClaude, profileLabel, CLAUDE_URL, STORAGE_KEY } from '../lib/browser-profiles.mjs'
+import { createAccountProfiles, onClaude, profileKey, profileLabel, CLAUDE_URL, STORAGE_KEY } from '../lib/browser-profiles.mjs'
 import { mergeSettings } from '../lib/hosts.mjs'
 
 const SETTINGS = mergeSettings({})
@@ -64,6 +64,42 @@ test('ensure finds the stored profile by id, even relabelled, and does not write
   assert.deepEqual(await w.profiles.ensure(w.ctx, 'a@example.com'), { ok: true, id: 'p9', created: false })
   assert.equal(w.callsWith('tab profile create').length, 0)
   assert.deepEqual(w.store[STORAGE_KEY], { 'a@example.com': 'p9' })
+})
+
+test('a profile is keyed by the lowercased e-mail of its login, else by the name, and labelled by the e-mail', () => {
+  assert.equal(profileKey({ name: 'A@example.com:acme', email: 'A@EXAMPLE.com' }), 'a@example.com')
+  assert.equal(profileKey('Work'), 'Work')
+  assert.equal(profileKey({ name: 'Work', email: null }), 'Work')
+  assert.equal(profileLabel({ name: 'a@example.com:acme', email: 'a@example.com' }), 'grazr · a@example.com')
+  assert.equal(profileLabel({ name: 'work' }), 'grazr · work')
+})
+
+test('a legacy entry stored under the account name is still found, and gains the e-mail key at the next ensure', async () => {
+  const w = world({ profiles: [{ id: 'p9', label: 'grazr · work' }], stored: { [STORAGE_KEY]: { work: 'p9' } } })
+  assert.equal(await w.profiles.find({ name: 'work', email: 'a@example.com' }, w.orca.profiles), 'p9')
+  assert.equal(await w.profiles.find('work', w.orca.profiles), 'p9', 'a lookup by the name alone still works')
+  assert.deepEqual(await w.profiles.ensure(w.ctx, { name: 'work', email: 'A@example.com' }), { ok: true, id: 'p9', created: false })
+  assert.deepEqual(w.store[STORAGE_KEY], { work: 'p9', 'a@example.com': 'p9' })
+})
+
+test("a second organization of a login reuses the login's profile, by its e-mail key or by its label", async () => {
+  const stored = world({ profiles: [{ id: 'p3', label: 'grazr · a@example.com' }], stored: { [STORAGE_KEY]: { 'a@example.com': 'p3' } } })
+  assert.deepEqual(await stored.profiles.ensure(stored.ctx, { name: 'a@example.com:acme', email: 'a@example.com' }), { ok: true, id: 'p3', created: false })
+  assert.deepEqual(stored.store[STORAGE_KEY], { 'a@example.com': 'p3', 'a@example.com:acme': 'p3' })
+  const labelled = world({ profiles: [{ id: 'p4', label: 'grazr · a@example.com' }] })
+  assert.equal(await labelled.profiles.find({ name: 'a@example.com:acme', email: 'a@example.com' }, labelled.orca.profiles), 'p4')
+  const fresh = world()
+  assert.equal((await fresh.profiles.ensure(fresh.ctx, { name: 'a@example.com:acme', email: 'a@example.com' })).created, true)
+  assert.equal(argAfter(fresh.callsWith('tab profile create')[0], '--label'), 'grazr · a@example.com', 'a new profile is labelled by the login')
+})
+
+test('remember writes the e-mail key and the name key together, and nothing when both already say so', async () => {
+  const w = world({ stored: { [STORAGE_KEY]: { 'c@example.com': 'p5' } } })
+  await w.profiles.remember({ name: 'a@example.com:acme', email: 'A@example.com' }, 'p1')
+  assert.deepEqual(w.store[STORAGE_KEY], { 'c@example.com': 'p5', 'a@example.com': 'p1', 'a@example.com:acme': 'p1' })
+  const before = w.store[STORAGE_KEY]
+  await w.profiles.remember({ name: 'a@example.com:acme', email: 'a@example.com' }, 'p1')
+  assert.equal(w.store[STORAGE_KEY], before, 'the store is not written again')
 })
 
 test('ensure falls back to the labelled profile when the stored id is gone, and remembers the new id', async () => {

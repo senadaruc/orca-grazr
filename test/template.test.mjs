@@ -204,3 +204,10 @@ test('tooltip treats a missing data-tip attribute as an empty line', async () =>
   assert.ok(html.includes("getAttribute('data-tip-' + key) || ''"))
   assert.ok(html.includes('if (!text) return'))
 })
+
+test('template styles the login groups: the row header, the member rows, the list section and greyed discovered organizations', async () => {
+  const html = await readFile(templateUrl, 'utf8')
+  for (const rule of ['.group-head {', '.group-name {', '.row-member {', '.acct-group {', '.acct-group-head {', '.acct-discovered {', '.row-unsupported .row-name {']) {
+    assert.ok(html.includes(rule), rule)
+  }
+})

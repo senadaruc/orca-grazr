@@ -51,9 +51,24 @@ test('open-browser from the panel opens claude.ai as the named account in its ow
   assert.deepEqual(outcome, { ok: true, message: 'devbox: claude.ai\nOpened claude.ai as a@b in the orca-grazr workspace — sign in once there; Grazr keeps that profile for the account' })
   assert.deepEqual(orca.profiles, [{ id: 'p1', label: 'grazr · a@b' }])
   assert.deepEqual(orcaCalls(fake, 'tab create')[0], ['tab', 'create', '--worktree', `id:${WORKTREE.id}`, '--url', CLAUDE_URL, '--profile', 'p1'])
-  assert.equal(statusCalls(fake).length, 0, 'a named account needs no status')
+  assert.equal(statusCalls(fake).length, 1, "a named account's e-mail is read from a fresh status")
   assert.deepEqual(toasts(fake).at(-1), { title: 'devbox: claude.ai', body: 'Opened claude.ai as a@b in the orca-grazr workspace — sign in once there; Grazr keeps that profile for the account' })
   assert.deepEqual(fake.state.storage.browserProfiles, { 'a@b': 'p1' })
+})
+
+test("open-browser for a second organization of a login opens it in the login's profile, found by the e-mail from the status", async () => {
+  const accounts = [
+    { name: 'a@b.io', id: 'u1', email: 'a@b.io', login: 'u1', organization_uuid: 'o1' },
+    { name: 'a@b.io:acme', id: 'u1.o2', email: 'a@b.io', login: 'u1', organization_uuid: 'o2' },
+  ]
+  const orca = withOrca({ 'status --json': { stdout: JSON.stringify(report({ accounts })) } })
+  orca.profiles.push({ id: 'p7', label: 'grazr · a@b.io' })
+  const fake = await start({ route: orca.route, storage: { browserProfiles: { 'a@b.io': 'p7' } } })
+  const outcome = await call(fake, 'open-browser', { host: 'devbox', account: 'a@b.io:acme' })
+  assert.equal(outcome.message, 'devbox: claude.ai\nOpened claude.ai as a@b.io:acme in the orca-grazr workspace')
+  assert.equal(orcaCalls(fake, 'tab profile create').length, 0, 'no profile of its own is made')
+  assert.equal(argAfter(orcaCalls(fake, 'tab create')[0], '--profile'), 'p7')
+  assert.deepEqual(fake.state.storage.browserProfiles, { 'a@b.io': 'p7', 'a@b.io:acme': 'p7' })
 })
 
 test('open-browser from the palette opens claude.ai as the active account of the server', async () => {

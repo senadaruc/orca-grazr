@@ -122,7 +122,7 @@ test('a Mac card logs in on signinHost, opens the tab in the local workspace, an
   assert.equal(stdin.length, 1)
   assert.equal(stdin[0].where, 'local', 'the Mac enrols')
   assert.equal(stdin[0].input, EXPORT_LINE, 'the export arrives on stdin')
-  assert.match(stdin[0].line, /enrol --stdin --name a@example\.com --expect-email a@example\.com --json$/)
+  assert.match(stdin[0].line, /enrol --stdin --name a@example\.com --expect-email a@example\.com --expect-organization oa --json$/)
   assert.equal(callsWith(h, 'enrol --from').length, 0, 'no login directory is read on another host')
   assert.equal(h.published[0].title, 'mac: signed in')
   assert.equal(h.published[0].body, 'Enrolled a@example.com on mac')
