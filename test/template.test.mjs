@@ -190,7 +190,7 @@ test('the model rings have their track, fill, dim and tick rules, and the fill s
 
 test('the footnote is muted, centred and shown only on the dial face', async () => {
   const html = await readFile(templateUrl, 'utf8')
-  assert.ok(html.includes('.dial-note { font-size: 10.5px; color: var(--orca-muted-foreground, var(--muted-foreground, #999)); text-align: center; margin: 2px 0 0; }'))
+  assert.ok(html.includes('.dial-note { font-size: 9px; color: var(--orca-muted-foreground, var(--muted-foreground, #999)); text-align: center; margin: 2px 0 0; }'))
   assert.ok(html.includes('.host:not([data-face="dial"]) .dial-note { display: none }'))
 })
 

@@ -4,6 +4,12 @@ All notable changes to this plugin are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 0.11.4 - 2026-11-23
+
+### Changed
+
+- The panel's text is 20% smaller: the base size, the account names, badges, buttons, bar labels and the dial and clock text. Buttons, tabs and pills shrink with it. Nothing goes below 9px, so the smallest text is 9px.
+
 ## 0.11.3 - 2026-11-23
 
 ### Changed
