@@ -4,6 +4,12 @@ All notable changes to this plugin are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 0.11.2 - 2026-11-23
+
+### Changed
+
+- The organizations of one login sit inside one outline in the List face.
+
 ## 0.11.1 - 2026-11-23
 
 ### Fixed

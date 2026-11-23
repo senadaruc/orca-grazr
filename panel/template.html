@@ -220,7 +220,14 @@
       }
       .acct-active { border-color: var(--grazr-ok); }
       .acct-discovered { opacity: 0.6; }
-      .acct-group { display: flex; flex-direction: column; gap: 6px; }
+      .acct-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 8px;
+        border: 1px solid var(--orca-border, var(--border, transparent));
+        border-radius: 8px;
+      }
       .acct-group-head {
         display: flex;
         flex-wrap: wrap;
