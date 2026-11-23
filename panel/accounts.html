@@ -297,12 +297,14 @@
       .row-next .row-label { color: var(--grazr-next); }
       .row-blocked .row-label { color: var(--orca-destructive, var(--destructive, #f87171)); }
       .row-active .row-label { color: var(--grazr-ok); }
-      .row > .act {
+      .row-acts {
         grid-column: 2 / -1;
-        justify-self: start;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 6px;
         margin: 2px 0 2px;
-        font-size: 11px;
       }
+      .row-acts .act { font-size: 11px; }
       .actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
       @media (min-width: 540px) { .actions { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
       .actions > .act:only-child { justify-self: start; }
@@ -336,7 +338,7 @@
     </style>
   </head>
   <body>
-    <main><section class="placeholder"><p>Waiting for the first status run — open Cmd-J › Grazr: Refresh panel</p><p>Installed copies never write this page: Orca verifies their files by hash.</p><p>The panel only updates in a development install, a git checkout added by path.</p></section></main>
+    <main><section class="placeholder"><p>Waiting for the first status run — open Cmd-J › Grazr: Reload panel</p><p>Installed copies never write this page: Orca verifies their files by hash.</p><p>The panel only updates in a development install, a git checkout added by path.</p></section></main>
     <footer id="stamp"></footer>
     <div class="tip" hidden></div>
     <script>
@@ -478,10 +480,25 @@
 
       // Each card opens on the face and window its data-view and data-face carry (the settings' choice).
       // A click sets the choice on every card at once; nothing is stored, so it holds until the page is next rewritten.
-      document.querySelectorAll('section.host').forEach(function (card) {
-        setView(card, card.getAttribute('data-view'))
-        setFace(card, card.getAttribute('data-face'))
-      })
+      // The cards' own listeners are wired by wireMain, at load and again after the worker posts new cards.
+      function wireViews() {
+        document.querySelectorAll('section.host').forEach(function (card) {
+          setView(card, card.getAttribute('data-view'))
+          setFace(card, card.getAttribute('data-face'))
+        })
+        document.querySelectorAll('button.view').forEach(function (toggle) {
+          toggle.addEventListener('click', function () {
+            var view = toggle.getAttribute('data-view')
+            document.querySelectorAll('section.host').forEach(function (card) { setView(card, view) })
+          })
+        })
+        document.querySelectorAll('button.face').forEach(function (toggle) {
+          toggle.addEventListener('click', function () {
+            var face = toggle.getAttribute('data-face')
+            document.querySelectorAll('section.host').forEach(function (card) { setFace(card, face) })
+          })
+        })
+      }
       // The dial's tooltip: one delegated listener per event, so the cards drawn later need no binding.
       // Every line is made with createElement and textContent; nothing from the data is parsed as HTML.
       var tip = document.querySelector('.tip')
@@ -532,18 +549,6 @@
         try { if (e.target.closest && e.target.closest(TIP_SEG)) tip.hidden = true } catch (err) {}
       })
 
-      document.querySelectorAll('button.view').forEach(function (toggle) {
-        toggle.addEventListener('click', function () {
-          var view = toggle.getAttribute('data-view')
-          document.querySelectorAll('section.host').forEach(function (card) { setView(card, view) })
-        })
-      })
-      document.querySelectorAll('button.face').forEach(function (toggle) {
-        toggle.addEventListener('click', function () {
-          var face = toggle.getAttribute('data-face')
-          document.querySelectorAll('section.host').forEach(function (card) { setFace(card, face) })
-        })
-      })
       // The params are the JSON the button carries; a value that does not parse sends none.
       function paramsOf(button) {
         try {
@@ -611,11 +616,13 @@
         })
       }
 
-      document.querySelectorAll('button.act[data-command]').forEach(function (button) {
-        button.addEventListener('click', function () {
-          runCommand(button)
+      function wireButtons() {
+        document.querySelectorAll('button.act[data-command]').forEach(function (button) {
+          button.addEventListener('click', function () {
+            runCommand(button)
+          })
         })
-      })
+      }
 
       // The list face's reading age: "Reading from …" under each account, at load and every 30 s.
       // Under a minute it reads "just now"; otherwise the largest whole day, hour or minute that fits.
@@ -643,7 +650,6 @@
           } catch (e) {}
         })
       }
-      ageLines()
       setInterval(ageLines, 30000)
 
       // The host tabs: one tab per host, and one card shown at a time. Selecting a tab marks it aria-selected with
@@ -678,16 +684,59 @@
         if (key === 'End') return tabs[n - 1]
         return null
       }
-      tabsOf().forEach(function (tab) {
-        tab.addEventListener('click', function () { selectHost(tab.getAttribute('data-host')) })
-        tab.addEventListener('keydown', function (event) {
-          var next = tabAfter(event.key, tab)
-          if (!next) return
-          event.preventDefault()
-          selectHost(next.getAttribute('data-host'))
-          next.focus()
+      function wireTabs() {
+        tabsOf().forEach(function (tab) {
+          tab.addEventListener('click', function () { selectHost(tab.getAttribute('data-host')) })
+          tab.addEventListener('keydown', function (event) {
+            var next = tabAfter(event.key, tab)
+            if (!next) return
+            event.preventDefault()
+            selectHost(next.getAttribute('data-host'))
+            next.focus()
+          })
         })
-      })
+      }
+      function wireMain() {
+        wireViews()
+        wireButtons()
+        wireTabs()
+        ageLines()
+      }
+      wireMain()
+
+      // The worker's 'panel' post (Orca 1.4.246+): the new tab strip and cards replace the old in place, with the page's
+      // data, so the page is not reloaded. The selected tab holds when its host is still there, else the posted target
+      // shows; the view and face the user chose hold on every new card; the clocks are drawn again from the new data.
+      function selectedHost() {
+        var name = null
+        tabsOf().forEach(function (tab) { if (tab.getAttribute('aria-selected') === 'true') name = tab.getAttribute('data-host') })
+        return name
+      }
+      function applyPanel(payload) {
+        if (!payload || typeof payload.main !== 'string' || !payload.data || typeof payload.data !== 'object') return
+        var main = document.querySelector('main')
+        if (!main) return
+        var kept = selectedHost()
+        var first = document.querySelector('section.host')
+        var view = first && first.getAttribute('data-view')
+        var face = first && first.getAttribute('data-face')
+        main.innerHTML = payload.main
+        data = payload.data
+        wireMain()
+        if (view || face) {
+          document.querySelectorAll('section.host').forEach(function (card) {
+            if (view) setView(card, view)
+            if (face) setFace(card, face)
+          })
+        }
+        var stillThere = false
+        tabsOf().forEach(function (tab) { if (tab.getAttribute('data-host') === kept) stillThere = true })
+        if (stillThere) selectHost(kept)
+        if (typeof window.grazrDraw === 'function') window.grazrDraw()
+      }
+      if (window.orca && window.orca.plugin && typeof window.orca.plugin.on === 'function') {
+        window.orca.plugin.on('panel', applyPanel)
+      }
 
       // The panel follows the focused workspace's host. While the page is visible, every FOCUS_POLL_MS (and on load and
       // when it becomes visible) the worker reports which host the focused workspace is on. A change of that host selects
@@ -721,17 +770,19 @@
       setInterval(pollFocus, FOCUS_POLL_MS)
       document.addEventListener('visibilitychange', pollFocus)
 
-      document.getElementById('stamp').textContent = 'Cmd-J Grazr: Refresh panel'
+      document.getElementById('stamp').textContent = 'Cmd-J Grazr: Reload panel'
 
       // Once per load, and only for a stale page: the refresh rewrites the page, and a fresh page is never refreshed again.
-      if (data.generatedAt && Date.now() - Date.parse(data.generatedAt) > STALE_MS) {
+      // The placeholder (no generatedAt) wakes the worker too where it can post the live page back (Orca 1.4.246+).
+      var stale = data.generatedAt ? Date.now() - Date.parse(data.generatedAt) > STALE_MS : hostHasRequest()
+      if (stale) {
         runWorker('panel-refresh', {}).then(function (result) {
           // A failed or timed-out wake-up leaves the page stale; the footer says how to refresh it by hand.
           // A host that runs it neither way leaves the footer as it is, since an old generatedAt does not mean stale data.
           if (FALLBACK_CODES.indexOf(result.errorCode) >= 0) return
           var outcome = (result.value && result.value.value) || {}
           if (!result.ok || outcome.ok === false) {
-            document.getElementById('stamp').textContent = 'Panel refresh failed — Cmd-J Grazr: Refresh panel'
+            document.getElementById('stamp').textContent = 'Panel refresh failed — Cmd-J Grazr: Reload panel'
           }
         })
       }
@@ -1153,7 +1204,9 @@ export function clockSvg(clock, { now, span, timeZone }) {
   const accounts = clock.accounts ?? []
   const indexOf = (id) => accounts.find((a) => a.id === id)?.index ?? 1
   const nameOf = (id) => accounts.find((a) => a.id === id)?.name ?? String(id)
-  const acctClass = (id) => `acct-${((indexOf(id) - 1) % 5) + 1}`
+  // The colour follows the rotation slot, so it holds while the shown number follows the display order.
+  const slotOf = (id) => accounts.find((a) => a.id === id)?.slot ?? indexOf(id)
+  const acctClass = (id) => `acct-${((slotOf(id) - 1) % 5) + 1}`
   const angle = (seconds) => turn(seconds, span, timeZone) * 360
 
   const count = weekly ? 7 : 24
@@ -1224,6 +1277,8 @@ export function clockSvg(clock, { now, span, timeZone }) {
       }
       draw()
       setInterval(draw, 30000)
+      // A post of new cards from the worker draws them too.
+      window.grazrDraw = draw
     </script>
   </body>
 </html>

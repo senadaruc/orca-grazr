@@ -11,8 +11,8 @@ const KINDS = [
   { kind: 'enrol', command: 'enrol', params: { host: 'mac' }, label: 'Add account…', palette: PALETTE['add-account'], title: PALETTE['add-account'] },
   { kind: 'rotation', command: 'rotation-toggle', params: { host: 'mac', enabled: false }, text: 'OFF0', label: 'Turn rotation off', palette: PALETTE['rotation-toggle'], title: PALETTE['rotation-toggle'] },
   { kind: 'swap', command: 'swap', params: { host: 'mac' }, text: 'swap mac', label: 'Swap to next', palette: PALETTE.swap, title: PALETTE.swap },
-  { kind: 'refresh', command: 'refresh', params: { host: 'mac' }, text: 'refresh mac', label: 'Refresh parked', palette: PALETTE.refresh, title: PALETTE.refresh },
-  { kind: 'panel-refresh', command: 'panel-refresh', params: {}, text: '', label: 'Refresh panel', palette: PALETTE['panel-refresh'], title: PALETTE['panel-refresh'] },
+  { kind: 'refresh', command: 'refresh', params: { host: 'mac' }, text: 'refresh mac', label: 'Refresh usage', palette: PALETTE.refresh, title: PALETTE.refresh },
+  { kind: 'panel-refresh', command: 'panel-refresh', params: {}, text: '', label: 'Reload panel', palette: PALETTE['panel-refresh'], title: PALETTE['panel-refresh'] },
 ]
 
 for (const transport of ['post', 'frame']) {

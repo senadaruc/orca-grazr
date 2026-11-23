@@ -9,7 +9,7 @@ import { mergeSettings } from '../lib/hosts.mjs'
 const NOW = new Date('2026-10-22T10:00:00Z')
 const TZ = 'Europe/Zurich'
 // The fixture is a ceiling (300 accounts across 10 hosts, two model rings each, every button wired); a real panel is a few accounts.
-const LIMIT = 1572864
+const LIMIT = 2097152
 const HOSTS = 10
 const ACCOUNTS = 30
 
@@ -50,7 +50,7 @@ const commandsFor = (hostName, accounts) => ({
   swapTo: Object.fromEntries(accounts.map((a) => [a.name, `${hostName} swap ${a.name}`])),
 })
 
-test('a page of 10 hosts with 30 accounts and 4 windows each, every button wired, on the list face, is under 1.5 MiB', async (t) => {
+test('a page of 10 hosts with 30 accounts and 4 windows each, every button wired, on the list face, is under 2 MiB', async (t) => {
   const hosts = Array.from({ length: HOSTS }, (_, h) => ({ name: `host-${h}`, ssh: `host-${h}.example` }))
   const settings = mergeSettings({ panelFace: 'list', hosts, target: hosts[0].name })
   const data = buildPanelData({

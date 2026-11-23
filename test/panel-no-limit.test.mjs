@@ -119,7 +119,7 @@ test('the card of a no-limit host opens on Week while the 5h button stays', () =
   const data = hostsOf(weeklyOnly(), 'session')
   const html = renderPanel(data, { template: '<html><body><!--__CARDS__--><script>/*__CLOCK__*/ /*__DATA__*/</script></body></html>' })
   assert.ok(html.includes('data-view="weekly"'))
-  assert.ok(html.includes('<button class="view" data-view="session">5h</button>'))
+  assert.ok(html.includes('<button class="view" data-view="session" title="Show the 5-hour usage window">5h</button>'))
 })
 
 const segmentOf = (data, name) => data.hosts[0].views.session.segments.find((x) => x.name === name)

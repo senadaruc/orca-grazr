@@ -51,7 +51,7 @@ function fakeFs(events = [], { dev = true } = {}) {
 }
 
 // Each harness answers status from a mutable report and records every status run with its timeout.
-function harness({ settings = fixtureSettings(undefined), fs = fakeFs(), clock = { now: 1000 }, state = { report: report() }, events = [], bundled = async () => '0.4.7+fork.6' } = {}) {
+function harness({ settings = fixtureSettings(undefined), fs = fakeFs(), clock = { now: 1000 }, state = { report: report() }, events = [], bundled = async () => '0.4.7+fork.6', post = undefined, panel = { open: false } } = {}) {
   const calls = []
   const logs = []
   const bundledCalls = []
@@ -80,9 +80,102 @@ function harness({ settings = fixtureSettings(undefined), fs = fakeFs(), clock =
     fs,
     log: (msg) => logs.push(msg),
     now: () => clock.now,
+    post,
+    panelOpen: () => panel.open,
   })
-  return { refresher, clock, state, calls, logs, fs, events, bundledCalls }
+  return { refresher, clock, state, calls, logs, fs, events, bundledCalls, panel }
 }
+
+// A host that posts to the plugin's open panels (Orca 1.4.246+): every post is kept.
+const poster = () => {
+  const posts = []
+  return { posts, post: (payload) => { posts.push(payload) } }
+}
+
+test('with a panel open on a posting host, a changed report is posted to the page and the file is left alone', async () => {
+  const p = poster()
+  const h = harness({ post: p.post })
+  assert.equal(await h.refresher.refresh(), 'written')
+  h.panel.open = true
+  h.state.report = report(10)
+  h.clock.now = 5000
+  assert.equal(await h.refresher.refresh(), 'posted')
+  assert.equal(h.fs.renames.length, 1)
+  assert.equal(p.posts.length, 1)
+  assert.ok(p.posts[0].main.includes('10% left'))
+  assert.ok(p.posts[0].main.includes('class="host-tabs"'))
+  assert.equal(typeof p.posts[0].data.generatedAt, 'string')
+  assert.ok('hosts' in p.posts[0].data)
+  assert.ok(!('main' in p.posts[0].data))
+  assert.ok(h.fs.files.get(PANEL).includes('40% left'))
+})
+
+test('with a panel open, the same data again is neither posted nor written, and a page that matches the file is not posted', async () => {
+  const p = poster()
+  const h = harness({ post: p.post })
+  await h.refresher.refresh()
+  h.panel.open = true
+  h.clock.now = 5000
+  assert.equal(await h.refresher.refresh(), 'unchanged')
+  h.state.report = report(10)
+  assert.equal(await h.refresher.refresh(), 'posted')
+  h.clock.now = 9000
+  assert.equal(await h.refresher.refresh(), 'unchanged')
+  assert.equal(p.posts.length, 1)
+  assert.equal(h.fs.renames.length, 1)
+})
+
+test('once the panel is closed, the file catches up with what was posted, and the next open panel starts from the file', async () => {
+  const p = poster()
+  const h = harness({ post: p.post })
+  await h.refresher.refresh()
+  h.panel.open = true
+  h.state.report = report(10)
+  assert.equal(await h.refresher.refresh(), 'posted')
+  h.panel.open = false
+  h.clock.now = 5000
+  assert.equal(await h.refresher.refresh(), 'written')
+  assert.ok(h.fs.files.get(PANEL).includes('10% left'))
+  h.panel.open = true
+  h.clock.now = 9000
+  assert.equal(await h.refresher.refresh(), 'unchanged')
+  assert.equal(p.posts.length, 1)
+})
+
+test('an installed copy with a panel open on a posting host gets the page posted, and again after a skipped write', async () => {
+  const p = poster()
+  const fs = fakeFs([], { dev: false })
+  const h = harness({ fs, post: p.post })
+  h.panel.open = true
+  assert.equal(await h.refresher.refresh(), 'posted')
+  assert.ok(p.posts[0].main.includes('40% left'))
+  assert.equal(fs.renames.length, 0)
+  h.panel.open = false
+  h.clock.now = 5000
+  assert.equal(await h.refresher.refresh(), 'skipped')
+  h.panel.open = true
+  h.clock.now = 9000
+  assert.equal(await h.refresher.refresh(), 'posted', 'the panel opened on the placeholder again')
+  assert.equal(p.posts.length, 2)
+})
+
+test('a post that throws is logged and the page is written instead', async () => {
+  const h = harness({ post: () => { throw new Error('too large') } })
+  await h.refresher.refresh()
+  h.panel.open = true
+  h.state.report = report(10)
+  assert.equal(await h.refresher.refresh(), 'written')
+  assert.equal(h.fs.renames.length, 2)
+  assert.ok(h.logs.some((l) => l.includes('panel post failed') && l.includes('too large')))
+})
+
+test('without a posting host, an open panel is written as before', async () => {
+  const h = harness({ panel: { open: true } })
+  assert.equal(await h.refresher.refresh(), 'written')
+  h.state.report = report(10)
+  assert.equal(await h.refresher.refresh(), 'written')
+  assert.equal(h.fs.renames.length, 2)
+})
 
 test('two refreshes with identical reports and different times write once', async () => {
   const h = harness()

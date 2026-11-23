@@ -90,7 +90,7 @@ test('a view without model limits carries an empty models list', () => {
 // --- Data: segment models and usable ---
 
 test('each segment lists its models in the view order, with the live weekly reading, its reset and tone', () => {
-  const [a, b, c, d, e] = viewsOf(modelReport()).weekly.segments
+  const { a, b, c, d, e } = Object.fromEntries(viewsOf(modelReport()).weekly.segments.map((s) => [s.name, s]))
   assert.deepEqual(a.models, [
     { scope: 'Fable', remaining: 79.4, resets: 'Tue 08:00', tone: 'fine' },
     { scope: 'Opus', remaining: 40, resets: null, tone: 'fine' },
@@ -111,14 +111,14 @@ test('each segment lists its models in the view order, with the live weekly read
 test('a model at or under the spent line reads spent', () => {
   const report = modelReport()
   report.accounts[1].snapshot.push(scoped('Opus', 2))
-  const [, b] = viewsOf(report).weekly.segments
+  const b = viewsOf(report).weekly.segments.find((s) => s.name === 'b')
   assert.equal(b.models[1].tone, 'spent')
 })
 
 test('the active account is always usable; the others only when not blocked and not short on any live window', () => {
   const segments = viewsOf(modelReport()).weekly.segments
   // a: active. b: short on Fable (3 under the threshold). c: blocked. d: full. e: a placeholder.
-  assert.deepEqual(segments.map((s) => s.usable), [true, false, false, true, false])
+  assert.deepEqual(segments.map((s) => [s.name, s.usable]), [['a', true], ['d', true], ['b', false], ['c', false], ['e', false]])
 })
 
 test('every segment carries a usable flag, on the session view too', () => {

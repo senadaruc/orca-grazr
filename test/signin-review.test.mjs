@@ -177,8 +177,10 @@ test('two concurrent add-account sign-ins get distinct fresh profiles, and each 
   h.spawns[0].child.exit(0)
   h.spawns[1].child.exit(0)
   await until(() => h.refreshes === 2)
-  assert.deepEqual(h.profiles, [])
-  assert.equal(deletesOf(h).length, 2)
+  // Both enrolled, so both profiles stay; the e-mail they share maps to the one kept last.
+  assert.equal(h.profiles.length, 2)
+  assert.equal(deletesOf(h).length, 0)
+  assert.ok(['p1', 'p2'].includes(h.store.browserProfiles['a@example.com']))
 })
 
 test('the limit firing before the address appears reports a timed-out sign-in', async () => {

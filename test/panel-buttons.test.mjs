@@ -40,16 +40,13 @@ const UNESCAPE = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;
 // The data-params attribute, unescaped and parsed.
 const paramsOf = (tag) => JSON.parse(attrsOf(tag)['data-params'].replace(/&(amp|lt|gt|quot|#39);/g, (m) => UNESCAPE[m]))
 
-test('the card actions carry their commands: refresh, panel refresh, add account, rotation off, swap to next', () => {
+test('the card actions carry their commands: refresh, add account, rotation off, swap to next; Reload panel is palette-only', () => {
   const html = cardOf(report())
   const refresh = buttonOf(html, 'refresh')
   assert.equal(attrsOf(refresh)['data-command'], 'refresh')
   assert.deepEqual(paramsOf(refresh), { host: 'mac' })
-  assert.ok(refresh.endsWith('>Refresh parked</button>'))
-  const panel = buttonOf(html, 'panel-refresh')
-  assert.equal(attrsOf(panel)['data-command'], 'panel-refresh')
-  assert.deepEqual(paramsOf(panel), {})
-  assert.ok(panel.endsWith('>Refresh panel</button>'))
+  assert.ok(refresh.endsWith('>Refresh</button>'))
+  assert.equal(html.includes('act-panel-refresh'), false)
   const enrol = buttonOf(html, 'enrol')
   assert.equal(attrsOf(enrol)['data-command'], 'enrol')
   assert.deepEqual(paramsOf(enrol), { host: 'mac' })
@@ -96,9 +93,8 @@ test('an account name is attribute-escaped in data-params and round-trips', () =
   assert.deepEqual(paramsOf(tag), { host: 'mac', account: 'o"brien <x> \'y\'' })
 })
 
-test('a button without its typed command is left out, and Refresh panel still shows with no commands', () => {
+test('a button without its typed command is left out', () => {
   const html = cardOf(report(), { commands: {} })
   assert.equal(html.includes('act-swap-to'), false)
   assert.equal(html.includes('act-refresh'), false)
-  assert.ok(buttonOf(html, 'panel-refresh'))
 })

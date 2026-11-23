@@ -2,13 +2,13 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { loadPage } from './support/page-harness.mjs'
 
-// The page script run in a vm over a stub DOM: one card 'mac' with a Switch and a Refresh parked button.
+// The page script run in a vm over a stub DOM: one card 'mac' with a Switch and a Refresh usage button.
 // Each behaviour runs on both transports: the older postMessage bridge and the Orca 1.4.245+ frame API.
 const CARD = {
   name: 'mac',
   buttons: [
     { kind: 'swap-to', command: 'swap', params: { host: 'mac', account: 'b' }, text: 'mac swap b', label: 'Switch', palette: "Grazr: Swap to the next account (this workspace's server)" },
-    { kind: 'refresh', command: 'refresh', params: { host: 'mac' }, text: 'mac refresh', label: 'Refresh parked', palette: "Grazr: Refresh parked accounts (this workspace's server)" },
+    { kind: 'refresh', command: 'refresh', params: { host: 'mac' }, text: 'mac refresh', label: 'Refresh usage', palette: "Grazr: Refresh usage (this workspace's server)" },
   ],
 }
 // The host runs a command and wraps its return value: a command's result is { value: { ok, message } }.
@@ -18,7 +18,7 @@ const FRESH = () => new Date(Date.now() - 1000).toISOString()
 const commandCalls = (page, id) => page.calls.filter((c) => c.action === 'commands.execute' && c.params.commandId === id)
 const msgOf = (page, name) => page.cardOf(name).querySelector('p.msg')
 const SWITCH = (page) => page.buttonOf('mac', 'swap-to')
-const FAILED_FOOTER = 'Panel refresh failed — Cmd-J Grazr: Refresh panel'
+const FAILED_FOOTER = 'Panel refresh failed — Cmd-J Grazr: Reload panel'
 
 for (const transport of ['post', 'frame']) {
   const t = (name, fn) => test(`${name} [${transport}]`, fn)
@@ -60,7 +60,7 @@ for (const transport of ['post', 'frame']) {
     await page.click(page.buttonOf('mac', 'refresh'))
     await page.respond(0, { ok: false, errorCode: 'capability_denied', error: 'denied' })
     assert.equal(page.calls.length, 1)
-    assert.equal(msgOf(page, 'mac').textContent, "Run Cmd-J › Grazr: Refresh parked accounts (this workspace's server)")
+    assert.equal(msgOf(page, 'mac').textContent, "Run Cmd-J › Grazr: Refresh usage (this workspace's server)")
     assert.equal(page.cardOf('mac').querySelector('pre.cmd'), null)
     assert.equal(page.cardOf('mac').getAttribute('data-busy'), 'false')
   })

@@ -70,8 +70,9 @@ test('ringSvg puts label, left, tone, name, tick and resets on every segment pat
   const tips = tipsOf(ringSvg(data.hosts[0].views.session))
   assert.equal(tips.length, 7)
   assert.deepEqual(tips[0], { label: 'All models', left: '42% left', tone: 'fine', name: 'a', tick: 'tick: grazr swaps below 15%', resets: 'resets Wed 18:00' })
-  assert.deepEqual(tips[2], { label: 'All models', left: 'no reading', tone: 'blocked', name: 'c', tick: 'tick: grazr swaps below 15%' })
-  assert.equal(tips[4].left, '10% left')
+  // In display order: a active, b and g usable, e spent, then c blocked.
+  assert.deepEqual(tips[4], { label: 'All models', left: 'no reading', tone: 'blocked', name: 'c', tick: 'tick: grazr swaps below 15%' })
+  assert.equal(tips[3].left, '10% left')
 })
 
 test('ringSvg leaves the tick empty when the report sets no threshold', () => {
@@ -108,6 +109,6 @@ test('the tooltip is kept inside the viewport and built with textContent, never 
   assert.ok(PAGE.includes('Math.min(e.clientX + 12, innerWidth - tip.offsetWidth - 8)'))
   assert.ok(PAGE.includes('Math.min(e.clientY + 12, innerHeight - tip.offsetHeight - 8)'))
   assert.ok(PAGE.includes('textContent'))
-  const tipScript = PAGE.slice(PAGE.indexOf('function tipFill'), PAGE.indexOf('</script>', PAGE.indexOf('function tipFill')))
+  const tipScript = PAGE.slice(PAGE.indexOf('function tipFill'), PAGE.indexOf('// The params are the JSON', PAGE.indexOf('function tipFill')))
   assert.equal(tipScript.includes('innerHTML'), false)
 })

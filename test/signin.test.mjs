@@ -32,9 +32,10 @@ test('a remote card signs in on its own host: the login runs there in a throwawa
   assert.equal(callsWith(h, 'login-export')[0].where, 'devbox', 'the e-mail is read on the login host')
   assertCleaned(h, { dir: D1, page: 'page-1' })
   assert.equal(closesOf(h, 'page-1')[0].args.includes('--environment'), false)
-  assert.deepEqual(deletesOf(h).map((c) => c.args.slice(3, 7)), [['--profile', 'p1', '--json']], 'the fresh profile is deleted')
-  assert.equal(deletesOf(h)[0].args.at(-1), '--json')
-  assert.ok(h.calls.findIndex((c) => c.line.includes('tab profile delete')) > h.calls.findIndex((c) => c.line.includes('tab close')), 'deleted after its tab closes')
+  // The account is enrolled, so the profile it signed in with is kept as its own and remembered by id.
+  assert.equal(deletesOf(h).length, 0, 'the fresh profile is kept')
+  assert.deepEqual(h.profiles, [{ id: 'p1', label: LABEL }])
+  assert.deepEqual(h.store.browserProfiles, { 'a@example.com': 'p1' })
 })
 
 test('a re-authentication passes the account as --email, labels its profile by the account, and enrols with --expect-email', async () => {

@@ -7,7 +7,7 @@ import { loadPage, TEMPLATE_PATH } from './support/page-harness.mjs'
 // Each behaviour runs on both transports, as the other page tests do; a tab never sends a call.
 const CARDS = [
   { name: 'mac', open: true, buttons: [] },
-  { name: 'lab', buttons: [{ kind: 'refresh', command: 'refresh', params: { host: 'lab' }, text: 'lab refresh', label: 'Refresh parked' }] },
+  { name: 'lab', buttons: [{ kind: 'refresh', command: 'refresh', params: { host: 'lab' }, text: 'lab refresh', label: 'Refresh usage' }] },
   { name: 'devbox', buttons: [] },
 ]
 const FRESH = () => new Date(Date.now() - 1000).toISOString()
@@ -91,5 +91,7 @@ for (const transport of ['post', 'frame']) {
 test('the template has no inline event handlers and no innerHTML for the tabs', async () => {
   const html = await readFile(TEMPLATE_PATH, 'utf8')
   assert.equal(/\son[a-z]+\s*=/i.test(html), false, 'an on* attribute')
-  assert.equal(/\.innerHTML\s*=/.test(html.split('<script type="module">')[0].replace(/\/\*__CLOCK__\*\//, '')), false)
+  const classic = html.split('<script type="module">')[0].replace(/\/\*__CLOCK__\*\//, '')
+  // The one assignment is applyPanel's: the worker's own rendering of the page, as the file holds it.
+  assert.deepEqual(classic.match(/\.innerHTML\s*=.*/g), ['.innerHTML = payload.main'])
 })

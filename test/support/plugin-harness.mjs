@@ -17,13 +17,17 @@ export function fakeOrca({ stored = {}, context = null, flags = {}, storage = {}
   const commands = new Map()
   const handlers = new Map()
   const panelHandlers = new Map()
+  const posts = []
   const calls = []
   const logs = []
   const orca = {
     commands: { register: (id, fn) => commands.set(id, fn) },
     events: { on: (name, fn) => handlers.set(name, fn) },
-    // Orca 1.4.246+ offers panels.handle; flags.noPanels is an older host without it.
-    ...(flags.noPanels ? {} : { panels: { handle: (name, fn) => panelHandlers.set(name, fn) } }),
+    // Orca 1.4.246+ offers panels.handle and panels.post; flags.noPanels is an older host without them.
+    ...(flags.noPanels ? {} : { panels: {
+      handle: (name, fn) => panelHandlers.set(name, fn),
+      post: (event, payload) => { posts.push({ event, payload }) },
+    } }),
     host: {
       call: async (name, params) => {
         calls.push({ name, params })
@@ -45,7 +49,7 @@ export function fakeOrca({ stored = {}, context = null, flags = {}, storage = {}
     },
     log: (msg) => logs.push(msg),
   }
-  return { orca, commands, handlers, panelHandlers, calls, logs, state, flags }
+  return { orca, commands, handlers, panelHandlers, posts, calls, logs, state, flags }
 }
 
 // Timers are inert: a scheduled callback is recorded but never fires on its own.

@@ -4,6 +4,35 @@ All notable changes to this plugin are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 0.9.11 - 2026-11-23
+
+Summarises 0.9.0 through 0.9.11. Needs the same Orca as 0.8.1; the in-place panel updates need 1.4.246 or later. The bundled engine is `0.4.7+fork.15`: run `Grazr: Install engine on target` on each host.
+
+### Added
+
+- One Orca browser profile per account, remembered by id in the plugin's storage (`browserProfiles`), so claude.ai opens already signed in as that account. A missing profile is created labelled `grazr · <account>`, and a relabelled one is still the account's.
+- `Open claude.ai` on every enrolled account, and the palette command `Grazr: Open claude.ai as the active account (this workspace's server)`. An open claude.ai tab in the account's profile is brought to the front; otherwise claude.ai opens in that profile in the sign-in workspace.
+- A swap from the panel or the palette opens claude.ai as the account swapped to, with the outcome as a toast. The setting `browserOnSwap` (default `true`) turns it off. Automatic rotation by the engine opens nothing.
+- Limit resets. An account that holds an unused limit reset shows a chip and offers reset buttons that type Claude Code's own `claude '/limit-reset fable'` or `claude '/limit-reset full'` (over `ssh -t` for a remote host) into the newest terminal, without pressing Return; Claude names the reset and asks before using it. A parked account offers `Swap + …` buttons, which swap the host to that account first. The same two are in the palette as `Grazr: Use a model limit reset` and `Grazr: Use a full limit reset`.
+- Grazr reads each account's limit resets from claude.ai's Settings › Usage page, in that account's browser profile: a background tab opens, the `Limit resets` section is read, and the tab closes, without clicking anything. Accounts are read one after another every 3 hours, shortly after start when the last reading is stale, and after a card's `Refresh`. Readings are kept in the plugin's storage (`limitResets`) and count for 12 hours. Team and Ultra pages are both read. The setting `readLimitResets` (default `true`) turns the reading off.
+- With a current reading an account offers exactly the resets the page counts, and the model reset button names the model (`Fable reset`). The chip says how many resets there are, and its hover text says which and until when. Without a reading the panel goes by Claude Code's own note, passed on by the engine.
+- Every button says what it does on hover.
+
+### Changed
+
+- The panel lists accounts in the order they matter, on every face: the active account first, then the accounts usable now, then the spent ones by soonest refill, and last the accounts grazr cannot swap to. Rotation still follows the engine's order, and each account keeps its colour.
+- On Orca 1.4.246 or later a change reaches an open panel as a post from the worker (`orca.panels.post`), and the page swaps its tabs and cards in place, keeping the selected tab and the toggles. The page file is written only while no panel is open, since a write to a development folder remounts the panel and restarts the worker. The page polls the focused host itself, so the worker no longer follows the workspace on those versions.
+- An installed copy's placeholder asks the worker for a refresh when it opens on Orca 1.4.246 or later, so its open panel shows live data too.
+- An add-account sign-in's fresh browser profile is kept as the account's once it is enrolled; it is deleted only when the sign-in fails or is cancelled.
+- A newly added account joins the end of the host's rotation order (`ACCOUNTS`) by itself, so it no longer shows `Not in ACCOUNTS` until `config.env` is edited by hand.
+- `Refresh parked` is now `Refresh`, one button per card, and the palette titles are `Grazr: Refresh usage (this workspace's server)` and `Grazr: Reload panel`. The command ids are unchanged. `Reload panel` has no button on the card any more.
+
+### Notes
+
+- Reading the Usage page depends on the page claude.ai shows the signed-in user, so it can stop working when that page changes; an unreadable page counts as not known, never as no resets. Each account's profile must be signed in to claude.ai.
+- A link an agent or Orca opens in a workspace still lands in Orca's default profile: Orca offers no way for a plugin to set it.
+- No new capability is declared. The browser profiles and the Usage page are driven through the `orca` CLI, and the panel posts need none.
+
 ## 0.8.1 - 2026-11-03
 
 Runs on official Orca 1.4.246 and later with working panel buttons, and still declares no capability for them. On 1.4.245 it behaves as 0.8.0 did.

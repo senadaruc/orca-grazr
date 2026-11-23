@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { profileLabel } from '../lib/signin.mjs'
 import { DEV, SETTINGS, STAMP, argAfter, callsWith, deletesOf, harness, json, openRemoteTab, until, LABEL } from './support/signin-harness.mjs'
 
-test('each add-account sign-in gets a fresh profile, a label taken in the same minute gets a suffix, and each is deleted when its job ends', async () => {
+test('each add-account sign-in gets a fresh profile, a label taken in the same minute gets a suffix, and a profile whose account was enrolled is kept for it', async () => {
   const h = harness()
   h.profiles.push({ id: 'seed', label: LABEL })
   const one = await openRemoteTab(h, null)
@@ -14,8 +14,11 @@ test('each add-account sign-in gets a fresh profile, a label taken in the same m
   await until(() => h.refreshes === 2)
   const labels = callsWith(h, 'tab profile create').map((c) => argAfter(c, '--label'))
   assert.deepEqual(labels, [LABEL, LABEL], 'the seeded profile is never the one listed after the create, so the new one is used')
-  assert.deepEqual(deletesOf(h).map((c) => argAfter(c, '--profile')), ['p1', 'p2'])
-  assert.deepEqual(h.profiles, [{ id: 'seed', label: LABEL }], 'only the seeded profile is left')
+  assert.equal(deletesOf(h).length, 0, 'an enrolled account keeps its profile')
+  assert.deepEqual(h.profiles, [{ id: 'seed', label: LABEL }, { id: 'p1', label: LABEL }, { id: 'p2', label: LABEL }])
+  // Both sign-ins enrolled the same e-mail, so its profile is the later one.
+  assert.deepEqual(h.store.browserProfiles, { 'a@example.com': 'p2' })
+  assert.ok(h.logs.some((m) => m === 'grazr sign-in: the browser profile is kept for a@example.com'))
   assert.equal(h.published.every((t) => t.title === 'devbox: signed in'), true)
 })
 
@@ -28,7 +31,18 @@ test('two add-account sign-ins in the same minute, with nothing taken, each get 
   two.exit(0)
   await until(() => h.refreshes === 2)
   assert.deepEqual(callsWith(h, 'tab profile create').map((c) => argAfter(c, '--label')), [LABEL, LABEL])
+  assert.deepEqual(h.profiles.map((p) => p.id), ['p1', 'p2'])
+})
+
+test('a fresh profile is deleted when the enrolment is refused, and nothing is remembered', async () => {
+  const h = harness({ overrides: { 'enrol --from': () => ({ code: 1, stdout: '{"ok":false,"error":"the e-mail is not the one expected"}\n' }) } })
+  const login = await openRemoteTab(h, null)
+  login.exit(0)
+  await until(() => h.refreshes === 1)
+  assert.deepEqual(deletesOf(h).map((c) => argAfter(c, '--profile')), ['p1'])
   assert.deepEqual(h.profiles, [])
+  assert.equal(h.store.browserProfiles, undefined)
+  assert.equal(h.published[0].title, 'devbox: sign-in failed')
 })
 
 test('a fresh profile is deleted when the sign-in fails after it was made', async () => {

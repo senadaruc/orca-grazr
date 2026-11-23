@@ -116,7 +116,8 @@ test('an active account that is not in the order is appended to the rotation; pl
   const report = fixture()
   report.order = ['b', 'ghost', 'c']
   const clock = clockOf(report)
-  assert.deepEqual(clock.accounts.map((a) => [a.id, a.index]), [['b', 1], ['c', 3], ['a', 4]])
+  // index is the row number (a active first, b usable, c spent); slot is the rotation position, the colour.
+  assert.deepEqual(clock.accounts.map((a) => [a.id, a.index, a.slot]), [['b', 2, 1], ['c', 3, 3], ['a', 1, 4]])
   assert.equal(clock.active, 'a')
   const unordered = fixture()
   unordered.order = []
@@ -150,8 +151,11 @@ test('viewBlock wraps the dial and adds a clock div per view with data-span, and
 test('the toggles row has 5h, Week, a spacer, Dial, Clock and List, and a card with no choice given opens on the default clock face', () => {
   const [mac] = panelOf(fixture()).hosts
   const html = renderCard({ ...mac, open: true }, {})
-  assert.ok(html.includes('<div class="views"><button class="view" data-view="session">5h</button><button class="view" data-view="weekly">Week</button>'
-    + '<span class="spacer"></span><button class="face" data-face="dial">Dial</button><button class="face" data-face="clock">Clock</button><button class="face" data-face="list">List</button></div>'))
+  assert.ok(html.includes('<div class="views"><button class="view" data-view="session" title="Show the 5-hour usage window">5h</button>'
+    + '<button class="view" data-view="weekly" title="Show the weekly usage window">Week</button><span class="spacer"></span>'
+    + '<button class="face" data-face="dial" title="Show how much of the window each account takes, as a dial">Dial</button>'
+    + '<button class="face" data-face="clock" title="Show on a clock when each account runs out at the current pace">Clock</button>'
+    + '<button class="face" data-face="list" title="Show every account with its usage bars and reset times">List</button></div>'))
   assert.ok(html.startsWith('<section role="tabpanel" class="host" data-host="mac" id="host-panel-0" aria-labelledby="host-tab-0" data-view="session" data-face="clock">'))
 })
 
@@ -181,7 +185,7 @@ test('renderPanel gives every card the settings face and window', () => {
   assert.ok(html.includes('<section role="tabpanel" class="host" data-host="mac" id="host-panel-0" aria-labelledby="host-tab-0" data-view="weekly" data-face="dial">'))
 })
 
-test('each row index carries acct-N with N from the row index modulo 5', () => {
+test('each row number carries acct-N with N from the rotation slot modulo 5', () => {
   const report = fixture()
   for (let i = 0; i < 2; i += 1) {
     report.accounts.push({ id: `x${i}`, name: `x${i}`, parked: true, blocked: null, snapshot: null })
@@ -189,9 +193,11 @@ test('each row index carries acct-N with N from the row index modulo 5', () => {
   }
   const [mac] = panelOf(report).hosts
   const html = renderCard({ ...mac, open: true }, {})
+  // Rows a, b, x0, x1, c, d sit in rotation slots 1, 2, 5, 6, 3, 4.
   assert.ok(html.includes('<span class="row-index acct-1">1</span>'))
-  assert.ok(html.includes('<span class="row-index acct-5">5</span>'))
-  assert.ok(html.includes('<span class="row-index acct-1">6</span>'))
+  assert.ok(html.includes('<span class="row-index acct-5">3</span>'))
+  assert.ok(html.includes('<span class="row-index acct-1">4</span>'))
+  assert.ok(html.includes('<span class="row-index acct-3">5</span>'))
 })
 
 test('renderPanel embeds clock data per reachable host and inlines lib/clock.mjs once', () => {

@@ -92,7 +92,7 @@ for (const transport of ['post', 'frame']) {
     await page.fireIntervals(POLL_MS)
     await page.respond(3, focused('mac', { ok: false }))
     assert.deepEqual(openNames(page), ['devbox'])
-    assert.equal(page.stamp.textContent, 'Cmd-J Grazr: Refresh panel', 'a quiet failure does not touch the footer')
+    assert.equal(page.stamp.textContent, 'Cmd-J Grazr: Reload panel', 'a quiet failure does not touch the footer')
   })
 
   t('a failed read keeps polling, and the next good answer opens its card', async () => {
@@ -112,7 +112,7 @@ for (const transport of ['post', 'frame']) {
       await page.setVisibility('hidden')
       await page.setVisibility('visible')
       assert.equal(polls(page).length, 1)
-      assert.equal(page.stamp.textContent, 'Cmd-J Grazr: Refresh panel')
+      assert.equal(page.stamp.textContent, 'Cmd-J Grazr: Reload panel')
       assert.deepEqual(openNames(page), ['mac'])
     })
   }

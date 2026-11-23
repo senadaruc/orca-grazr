@@ -12,7 +12,7 @@ Hosts are this Mac plus any remote machines you reach over `ssh`. Orca's own man
 |---|---|---|
 | ![Dial face of the Claude Accounts panel](docs/images/dial-dark.png) | ![List face of the Claude Accounts panel](docs/images/list-dark.png) | ![Clock face of the Claude Accounts panel](docs/images/clock-light.png) |
 
-The panel has three faces. **Dial** shows a ring with one segment per account, in rotation order. **Clock** shows a 24-hour face (5h view) or a 7-day face (Week view), with the swaps and refills projected ahead. **List** shows one card per account with a bar for each usage window.
+The panel has three faces. **Dial** shows a ring with one segment per account. **Clock** shows a 24-hour face (5h view) or a 7-day face (Week view), with the swaps and refills projected ahead. **List** shows one card per account with a bar for each usage window. On every face the active account comes first, then the accounts usable now, then the spent ones by soonest refill.
 
 ## Requirements
 
@@ -33,14 +33,14 @@ Until then, in Orca open **Settings › Plugins**, turn the plugin system on, an
 https://github.com/senadaruc/orca-grazr
 ```
 
-An installed copy shows the committed placeholder panel, and the palette commands work. To see live data in the panel, add the plugin's checkout as a development folder, as described under [Development](#development). An installed copy cannot rewrite its own panel, because Orca verifies installed files.
+An installed copy shows the committed placeholder panel, and the palette commands work. To see live data in the panel, add the plugin's checkout as a development folder, as described under [Development](#development). An installed copy cannot rewrite its own panel, because Orca verifies installed files. On Orca 1.4.246 or later an open panel of an installed copy still gets the live page: the placeholder asks the worker for a refresh when it opens, and the worker posts the page to it.
 
 ## First steps
 
 1. **Add your hosts.** The shipped default manages only this Mac. To add a remote host, edit the plugin's `settings.json` (see [Settings](#settings) and [Remote hosts](#remote-hosts)). The file lives at `<userData>/plugins-data/senadaruc.grazr/settings.json`.
 2. **Install the engine on the target host.** Press Cmd-J and run `Grazr: Install engine on target`. Use `Grazr: Target → next host` to move the target to another host first.
-3. **Enrol accounts.** Press Cmd-J and run `Grazr: Add an account (this workspace's server)`, which signs in through a local Orca workspace's built-in browser. Sign-in needs a remote host to log in on and a local Orca project on this Mac for the browser tab, and the default settings manage only this Mac, so add a remote host first (see [Remote hosts](#remote-hosts)). Then add the account names to the host's `config.env`, as described under [Enrolling accounts](#enrolling-accounts). Repeat for each host.
-4. **Open the panel.** Run `Grazr: Refresh panel`, then open the right sidebar and choose **Claude Accounts**.
+3. **Enrol accounts.** Press Cmd-J and run `Grazr: Add an account (this workspace's server)`, which signs in through a local Orca workspace's built-in browser. Sign-in needs a remote host to log in on and a local Orca project on this Mac for the browser tab, and the default settings manage only this Mac, so add a remote host first (see [Remote hosts](#remote-hosts)). A new account joins the end of the host's rotation order by itself; see [Enrolling accounts](#enrolling-accounts) to change the order. Repeat for each host.
+4. **Open the panel.** Run `Grazr: Reload panel`, then open the right sidebar and choose **Claude Accounts**.
 
 If another grazr already owns Claude's status line on the Mac, read [Status line owned by another grazr](#status-line-owned-by-another-grazr) before step 2.
 
@@ -50,7 +50,7 @@ Grazr runs on official Orca. Its actions are commands in the Cmd-J palette, and 
 
 - `Grazr: Re-authenticate a blocked account (this workspace's server)` signs in the first blocked account in rotation order.
 - `Grazr: Add an account (this workspace's server)` signs in a new account.
-- `Grazr: Swap to the next account (this workspace's server)`, `Grazr: Refresh parked accounts (this workspace's server)` and `Grazr: Turn rotation on/off (this workspace's server)` act on the focused workspace's server. When Orca does not report the focused workspace, they act on the target instead.
+- `Grazr: Swap to the next account (this workspace's server)`, `Grazr: Refresh usage (this workspace's server)` and `Grazr: Turn rotation on/off (this workspace's server)` act on the focused workspace's server. When Orca does not report the focused workspace, they act on the target instead.
 
 `Install engine`, `Uninstall` and `Target → next host` act on the target, as their titles say. Assign shortcuts to any of these commands in Orca's Shortcuts settings.
 
@@ -73,6 +73,8 @@ Orca keeps the settings in `<userData>/plugins-data/senadaruc.grazr/settings.jso
 - `forceInstall`: whether `Install engine` takes over a status line that another grazr owns. It is the default for every host; a host can override it with its own `forceInstall`.
 - `panelFace`: the face every card opens with: `clock`, `dial` or `list`. The default is `clock`.
 - `panelView`: the window every card opens with: `session` (5h) or `weekly` (Week). The default is `session`. A host whose accounts with readings are all Ultra accounts with no 5-hour limit opens on Week whatever this says.
+- `browserOnSwap`: whether a swap from the panel or the palette also opens claude.ai as the account swapped to, in that account's browser profile (see [Browser profiles](#browser-profiles)). The default is `true`. Automatic rotation by the engine never opens a browser.
+- `readLimitResets`: whether Grazr reads each account's limit resets from claude.ai's Settings › Usage page, in that account's browser profile (see [Limit resets](#limit-resets)). The default is `true`. With `false` nothing is opened, and the panel goes by Claude Code's own note alone.
 - `orcaBin`: the Orca CLI that opens each sign-in tab in a local Orca workspace. The default is `/usr/local/bin/orca`. A value that is blank or starts with `-` falls back to the default.
 - `signinWorkspace`: optional. The local Orca worktree the sign-in tab opens in, as an `id:<worktree id>` or `path:<folder>` selector. When it is unset, the first local worktree is used, and the plugin's own folder when it is one.
 - `signinHost`: optional. The name of a configured remote host. A sign-in for a card on this Mac logs in on it. When it is unset, the first remote host is used.
@@ -112,7 +114,7 @@ An Ultra account (the plan formerly called Max 20x) has no 5-hour limit under th
 How a sign-in works:
 
 - The login runs on one of your ssh hosts, in a throwaway directory there, over plain `ssh` with its stdin kept open (no pty). A card on a remote host logs in on that host. A card on this Mac logs in on `signinHost`, or on the first remote host. Without a remote host to log in on, the sign-in is refused at once.
-- The sign-in tab opens in a local Orca workspace on this Mac (`signinWorkspace`, or the first local worktree), in Orca's built-in browser, in an isolated browser profile, and is brought to the front. The start message names that workspace. A re-authentication reuses the account's profile, `grazr · <account>`. An add-account sign-in gets a fresh profile, `grazr · new account <yyyy-mm-dd hh:mm>`, which is deleted when the sign-in ends, whatever the outcome.
+- The sign-in tab opens in a local Orca workspace on this Mac (`signinWorkspace`, or the first local worktree), in Orca's built-in browser, in an isolated browser profile, and is brought to the front. The start message names that workspace. A re-authentication uses the account's own profile. An add-account sign-in gets a fresh profile, `grazr · new account <yyyy-mm-dd hh:mm>`, which becomes the account's profile once it is enrolled, and is deleted when the sign-in fails or is cancelled (see [Browser profiles](#browser-profiles)).
 - The sign-in fills in the e-mail and approves Claude Code, so you only type the code from the e-mail. A re-authentication fills in the account's e-mail, presses Continue and opens the code box, and Claude Code's consent is clicked once. An add-account sign-in leaves the e-mail to you. The plugin never fills the code box. Open the e-mail's link on another device (your phone), not in Orca's tab: a link opened there cannot sign the login in, so the tab is sent back to the start with a notice.
 - Approving in the tab sends the code back to the login by itself: the plugin reads the tab's address, and when it is Claude's code callback for this sign-in (matched by its state), it writes the code into the login's stdin, once. Nothing is copied by hand, and the code is never logged or shown.
 - A sign-in that is steered off the authorize flow is returned to it, at most five times.
@@ -126,7 +128,7 @@ To enrol from the terminal instead:
 1. Open a new shell terminal in a worktree, then run `Grazr: Type enrol command into terminal` from the palette. The command goes to the most recently opened terminal, so open a fresh shell first.
 2. Press Return in that terminal.
 3. Press `s` to save the account you are logged in to now, or `l` to log in to another account. After `l`, enter a name for the account when asked. To re-authenticate an enrolled account, enter the name it already has.
-4. List the accounts in the host's `~/.config/orca-grazr/config.env`:
+4. A new account joins the end of the host's rotation order (`ACCOUNTS`) by itself. An empty `ACCOUNTS` stays empty, since it already rotates through every account. To change the order, set it in the host's `~/.config/orca-grazr/config.env`:
 
    ```
    ACCOUNTS="work personal"
@@ -160,7 +162,9 @@ These commands appear in the Orca command palette. A command whose title says "t
 - `Grazr: Swap to the next account (this workspace's server)`: swaps the focused workspace's server to its next account now.
 - `Grazr: Re-authenticate a blocked account (this workspace's server)`: signs in the first blocked account in rotation order on the focused workspace's server. It says so when no account is blocked.
 - `Grazr: Add an account (this workspace's server)`: signs in a new account on the focused workspace's server.
-- `Grazr: Refresh parked accounts (this workspace's server)`: refreshes every account on the focused workspace's server, including the active one. It asks Claude's usage endpoint and refreshes any lapsed token.
+- `Grazr: Refresh usage (this workspace's server)`: refreshes every account on the focused workspace's server, including the active one. It asks Claude's usage endpoint and refreshes any lapsed token.
+- `Grazr: Open claude.ai as the active account (this workspace's server)`: opens claude.ai in Orca's browser, in the browser profile of that server's active account, so it is already signed in as that account. A claude.ai tab already open in that profile is brought to the front instead.
+- `Grazr: Use a model limit reset (type /limit-reset fable into terminal)` and `Grazr: Use a full limit reset (type /limit-reset full into terminal)`: type Claude Code's own `/limit-reset` for that server into the newest terminal of the focused worktree, without pressing Return. Claude names the reset and asks before it uses one; the plugin spends nothing itself.
 - `Grazr: Turn rotation on/off (this workspace's server)`: turns automatic rotation on or off on the focused workspace's server.
 - `Grazr: Install engine on target`: copies the engine to the target and installs grazr's status line and failure hook.
 - `Grazr: Uninstall from target`: removes grazr's status line and failure hook from the target.
@@ -168,7 +172,7 @@ These commands appear in the Orca command palette. A command whose title says "t
 - `Grazr: Type enrol command into terminal`: types the enrol command into the newest terminal of the focused worktree. It does not press Return.
 - `Grazr: Type status command into terminal`: types the status command into the newest terminal of the focused worktree. It does not press Return.
 - `Grazr: Show the focused workspace's host`: toasts the host the focused workspace belongs to. The panel asks for the same answer itself and does not toast.
-- `Grazr: Refresh panel`: regenerates the Claude Accounts panel from a fresh status run on every host, and reports whether the page changed.
+- `Grazr: Reload panel`: regenerates the Claude Accounts panel from a fresh status run on every host, and reports whether the page changed. The panel redraws itself on every change, so this is for a panel that looks stuck.
 
 ## Claude Accounts panel
 
@@ -180,10 +184,13 @@ Each card, under its tab, shows:
 
 - A header line with the swap thresholds the engine reports for that host, the time the host's data last changed, and a chip for the host's state: `rotation on`, `rotation off`, `not connected`, `unreachable`, `engine not installed`, `managed profile`, `engine update available` or `another grazr owns the status line`. `not connected` means the status line or the stop hook is missing on that host, so nothing rotates there.
 - An `engine <version>` line. When the installed engine differs from the one the plugin bundles, `engine update available` appears. Run `Grazr: Install engine on target` to update it.
-- A 5h view and a Week view, switched with the buttons at the top of the card. Each view has a ring with one numbered segment per account, in rotation order. A needle marks the share used on the active account's segment, and a tick marks the swap threshold. When the engine watches per-model limits (`MODEL_LIMITS=1` in that host's `config.env`), the Week view adds an inner ring per model. An account that has a weekly reading but no 5-hour window (some plans have no 5-hour limit) reads `no 5-hour limit` on the 5h view, muted and never counted as spent, and a host where no account has a 5-hour window opens on Week whatever `panelView` says. An Ultra account with no 5-hour limit (see [Ultra accounts](#ultra-accounts)) reads `no 5-hour limit (Ultra)` on every 5h face, muted, and is never spent or skipped for its 5-hour window. A host whose accounts with readings are all such Ultra accounts opens on Week too.
+- A 5h view and a Week view, switched with the buttons at the top of the card. Each view has a ring with one numbered segment per account, in the panel's order (see below). A needle marks the share used on the active account's segment, and a tick marks the swap threshold. When the engine watches per-model limits (`MODEL_LIMITS=1` in that host's `config.env`), the Week view adds an inner ring per model. An account that has a weekly reading but no 5-hour window (some plans have no 5-hour limit) reads `no 5-hour limit` on the 5h view, muted and never counted as spent, and a host where no account has a 5-hour window opens on Week whatever `panelView` says. An Ultra account with no 5-hour limit (see [Ultra accounts](#ultra-accounts)) reads `no 5-hour limit (Ultra)` on every 5h face, muted, and is never spent or skipped for its 5-hour window. A host whose accounts with readings are all such Ultra accounts opens on Week too.
 - A `Dial | Clock | List` switch. Hovering a segment shows its account, the percentage left, the swap threshold and the reset time.
 - Colours by account state: red for an account that is spent or blocked, green at reduced opacity for a parked account that still has tokens, grey for an unknown or unenrolled account, and orange and dashed for the next account.
 - One row per account, with its percentage and status: `active`, `NEXT ▸`, `spent · resets <day and time>`, `blocked: <reason>`, `not read yet` or `not enrolled`.
+- Buttons. Every button says what it does on hover. A card has `Refresh`, which asks Claude for fresh usage on that server and redraws the panel when it answers, and on a reachable host `Add account…`, `Swap to next` and the rotation switch. A row has `Swap to` or `Switch`, `Re-authenticate…` when it is blocked, `Open claude.ai` (see [Browser profiles](#browser-profiles)) and the reset buttons (see [Limit resets](#limit-resets)).
+
+The rows, the ring's segments and the list's cards are in the same order on every face, rearranged as the accounts change: the active account first, then the accounts usable now in rotation order (the first is `NEXT ▸`), then the spent ones, the one that has tokens again soonest first, and last the accounts grazr cannot swap to (blocked, no parked login, or not enrolled). The number on a row is its place in that order, and the clock's dots carry the same numbers. An account keeps its colour however it moves. The order is only how the panel shows the accounts: rotation still follows the engine's order.
 
 The next account is the first account in rotation order, other than the active one, that is parked, not blocked, and has no live window below its threshold. This is the engine's rule, so `NEXT ▸` names the account that a swap moves to.
 
@@ -197,9 +204,39 @@ The List face shows one card per account, with a bar for each usage window: 5h, 
 
 ### When the panel updates
 
-The worker regenerates the panel when the plugin activates, after each drain tick while the drain loop runs, and after target next, status, swap, refresh, toggle rotation, install and uninstall. The page is rewritten only when something on it changed. The `5h | Week` and `Dial | Clock | List` toggles switch every card until the page is next rewritten.
+The worker regenerates the panel when the plugin activates, after each drain tick while the drain loop runs, and after target next, status, swap, refresh, toggle rotation, install and uninstall. The page changes only when something on it changed.
+
+On Orca 1.4.246 or later a change reaches an open panel as a post from the worker (`orca.panels.post`): the page swaps its tabs and cards in place, keeping the selected tab and the `5h | Week` and `Dial | Clock | List` toggles. The page file is written only while no panel is open, because a write to a development folder remounts the panel and restarts the worker. Before 1.4.246 every change is a write, and the panel reloads with it.
 
 A host that times out under a short command budget keeps its last reading. A host that times out at the full ten seconds is shown as `unreachable`.
+
+## Browser profiles
+
+Orca's built-in browser keeps one cookie jar per browser profile. Grazr keeps one profile per account, so claude.ai stays signed in as that account there. It remembers which profile belongs to which account by the profile's id, in the plugin's storage (`browserProfiles`), so a relabelled profile is still the account's. A profile Grazr creates for an account is labelled `grazr · <account>`.
+
+- `Open claude.ai` on an account's row, and `Grazr: Open claude.ai as the active account (this workspace's server)`, bring a claude.ai tab open in the account's profile to the front, or open `https://claude.ai/` in that profile in the sign-in workspace. An account with no profile yet gets one, and claude.ai asks for one sign-in there; the profile is the account's from then on.
+- A swap from the panel or the palette opens claude.ai as the account swapped to, once the swap has answered, with the outcome as a toast. `browserOnSwap: false` turns that off.
+- A link an agent or Orca opens in a workspace still lands in Orca's default profile, since Orca offers no way for a plugin to set the default profile. Pick the account's profile from the browser toolbar there, or use `Open claude.ai`.
+
+## Limit resets
+
+An account can hold unused limit resets, which Claude Code spends with its own `/limit-reset` command. Grazr shows them and offers buttons that type that command for you.
+
+Grazr reads each account's resets from claude.ai's Settings › Usage page, the `Limit resets` section, in the account's browser profile:
+
+- It opens `https://claude.ai/settings/usage` in a background tab of the sign-in workspace, reads the page's text, and closes the tab. It never clicks anything there. Accounts are read one after another.
+- It reads every 3 hours while the plugin runs, a minute after start when the last reading is older than that, and after a card's `Refresh`. `readLimitResets: false` turns it off.
+- Readings are kept in the plugin's storage (`limitResets`). A reading older than 12 hours counts as none, and a failed read keeps the last good one until then.
+- Only accounts that already have a browser profile are read; Grazr creates none for this. An account without one, or whose profile is signed out, says so in the hover text of its `Open claude.ai` button. Sign in there once.
+
+What the panel offers:
+
+- With a current reading, an account offers exactly the resets the page counts: a model reset (the button names the model, e.g. `Fable reset`) when it holds one, and `Full reset` when it holds a full one. The chip and the row say how many resets the page counted, and their hover text says which and until when. An account the page shows without resets offers none.
+- Without a reading the panel goes by Claude Code's own note of the account, passed on by the engine, which lapses after three days. `Reset available` shows when Claude noted an unused reset. The active account offers both buttons unless Claude noted it holds none; a parked account offers them only on Claude's note.
+- On the active account a reset button types `claude '/limit-reset fable'` or `claude '/limit-reset full'` (over `ssh -t` for a remote host) into the newest terminal of the worktree, without pressing Return. On a parked account the buttons read `Swap + …`: Claude uses a reset for the login it runs on, so the host is swapped to that account first, then the command is typed. No swap is made when no terminal is open.
+- Claude names the reset and asks before it uses one. Grazr never presses `Reset for free` itself.
+
+The reading depends on the page claude.ai shows the signed-in user, so it can stop working when that page changes. An unreadable page counts as not known, never as no resets. The resets are those of the organization the profile has selected. Every 3 hours a tab opens briefly in the background for each account with a profile.
 
 ## Notifications
 
@@ -226,7 +263,7 @@ Run the tests from the repository root. The suite uses Node's built-in test runn
 npm test
 ```
 
-To run the plugin from a checkout with live panel data, add the folder in Orca under **Settings › Plugins › Development folders**. A development folder overrides an installed copy with the same id. Orca then writes `panel/accounts.html` in the folder. The file embeds your host names and account names, so keep it out of commits:
+To run the plugin from a checkout with live panel data, add the folder in Orca under **Settings › Plugins › Development folders**. A development folder overrides an installed copy with the same id. Orca then writes `panel/accounts.html` in the folder while no panel is open. The file embeds your host names and account names, so keep it out of commits:
 
 ```sh
 git update-index --skip-worktree panel/accounts.html

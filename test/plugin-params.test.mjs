@@ -11,7 +11,7 @@ test('swap with a host and an account runs swap <account> on that host and retur
   const outcome = await call(fake, 'swap', { host: 'devbox', account: 'a@b' })
   assert.ok(ranOn(fake, 'swap a@b', 'devbox'))
   assert.equal(outcome.ok, true)
-  assert.equal(outcome.message, 'devbox: swap\nswapped')
+  assert.equal(outcome.message, 'devbox: swap\nswapped\nOpening claude.ai as a@b…')
 })
 
 test('swap with no params runs a plain swap on the target, as in 0.5.x', async () => {

@@ -133,7 +133,7 @@ test('placeholder page equals placeholderPanel(template)', async () => {
 
 test('template footer only names the refresh command; the as-of time moved into each card header', async () => {
   const html = await readFile(templateUrl, 'utf8')
-  assert.ok(html.includes("textContent = 'Cmd-J Grazr: Refresh panel'"))
+  assert.ok(html.includes("textContent = 'Cmd-J Grazr: Reload panel'"))
   assert.ok(!html.includes("'as of '"))
 })
 

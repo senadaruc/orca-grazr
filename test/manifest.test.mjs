@@ -13,18 +13,18 @@ test('manifest identifies the grazr plugin', () => {
   assert.equal(manifest.publisher, 'senadaruc')
 })
 
-test('manifest declares exactly fourteen commands with unique ids', () => {
+test('manifest declares exactly seventeen commands with unique ids', () => {
   const ids = manifest.contributes.commands.map((c) => c.id)
-  assert.equal(ids.length, 14)
-  assert.equal(new Set(ids).size, 14)
+  assert.equal(ids.length, 17)
+  assert.equal(new Set(ids).size, 17)
 })
 
-test('only enrol and status-terminal are worktree-scoped', () => {
+test('only the commands that type into a terminal are workspace-scoped', () => {
   const scoped = manifest.contributes.commands
     .filter((c) => c.when === 'workspace')
     .map((c) => c.id)
     .sort()
-  assert.deepEqual(scoped, ['enrol', 'status-terminal'])
+  assert.deepEqual(scoped, ['enrol', 'limit-reset-full', 'limit-reset-model', 'status-terminal'])
 })
 
 test('manifest is format 2, trusted-worker, MIT, and needs Orca 1.4.245 or later', () => {
@@ -53,7 +53,7 @@ test('manifest declares the accounts panel and the panel-refresh command', () =>
   assert.deepEqual(manifest.contributes.panels, [
     { id: 'accounts', title: 'Claude Accounts', icon: 'gauge', entry: 'panel/accounts.html' },
   ])
-  assert.ok(manifest.contributes.commands.some((c) => c.id === 'panel-refresh' && c.title === 'Grazr: Refresh panel'))
+  assert.ok(manifest.contributes.commands.some((c) => c.id === 'panel-refresh' && c.title === 'Grazr: Reload panel'))
 })
 
 test('the palette titles the panel names are the manifest command titles', () => {
@@ -61,8 +61,8 @@ test('the palette titles the panel names are the manifest command titles', () =>
   for (const [id, title] of Object.entries(PALETTE)) assert.equal(titles[id], title, id)
 })
 
-test('manifest and package declare version 0.8.1', async () => {
+test('manifest and package declare version 0.9.11', async () => {
   const pkg = JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8'))
-  assert.equal(manifest.version, '0.8.1')
-  assert.equal(pkg.version, '0.8.1')
+  assert.equal(manifest.version, '0.9.11')
+  assert.equal(pkg.version, '0.9.11')
 })

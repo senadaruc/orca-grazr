@@ -8,7 +8,7 @@ const CARD = {
   name: 'mac',
   buttons: [
     { kind: 'swap-to', command: 'swap', params: { host: 'mac', account: 'b' }, text: 'mac swap b', label: 'Switch', palette: "Grazr: Swap to the next account (this workspace's server)" },
-    { kind: 'refresh', command: 'refresh', params: { host: 'mac' }, text: 'mac refresh', label: 'Refresh parked', palette: "Grazr: Refresh parked accounts (this workspace's server)" },
+    { kind: 'refresh', command: 'refresh', params: { host: 'mac' }, text: 'mac refresh', label: 'Refresh usage', palette: "Grazr: Refresh usage (this workspace's server)" },
   ],
 }
 const FRESH = () => new Date(Date.now() - 1000).toISOString()
@@ -58,7 +58,7 @@ test('when neither route runs the button, the card names the Cmd-J command', asy
   await page.click(page.buttonOf('mac', 'refresh'))
   await page.respond(0, { ok: false, errorCode: 'unknown_method', error: 'no panel handler named refresh' })
   await page.respond(1, { ok: false, errorCode: 'capability_denied', error: 'denied' })
-  assert.equal(msgOf(page, 'mac').textContent, "Run Cmd-J › Grazr: Refresh parked accounts (this workspace's server)")
+  assert.equal(msgOf(page, 'mac').textContent, "Run Cmd-J › Grazr: Refresh usage (this workspace's server)")
   assert.equal(page.cardOf('mac').getAttribute('data-busy'), 'false')
 })
 
@@ -102,5 +102,13 @@ test('a stale page wakes the worker through plugin.request and reports a failed 
   assert.equal(page.calls.length, 1)
   assert.deepEqual(page.calls[0].params, { name: 'panel-refresh', input: {}, timeoutMs: 30000 })
   await page.respond(0, answered({ ok: false, message: 'panel refresh failed' }))
-  assert.equal(page.stamp.textContent, 'Panel refresh failed — Cmd-J Grazr: Refresh panel')
+  assert.equal(page.stamp.textContent, 'Panel refresh failed — Cmd-J Grazr: Reload panel')
+})
+
+// The placeholder is the page an installed copy keeps, and the page on disk while an open panel was posted to:
+// where the worker can post, it asks for one refresh on load, which reaches it as a post.
+test('the placeholder wakes the worker through plugin.request, once', async () => {
+  const page = await load({ generatedAt: null, cards: [] })
+  assert.equal(page.calls.length, 1)
+  assert.deepEqual(page.calls[0].params, { name: 'panel-refresh', input: {}, timeoutMs: 30000 })
 })

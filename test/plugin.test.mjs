@@ -10,11 +10,11 @@ import { ROOT, fakeFs, fakeTimers, engine, label, start, statusRoute, statusExec
 
 const manifest = JSON.parse(await readFile(resolve(ROOT, 'orca-plugin.json'), 'utf8'))
 
-test('registers exactly the fourteen manifest command ids and the two events', async () => {
+test('registers exactly the seventeen manifest command ids and the two events', async () => {
   const { commands, handlers, plugin } = await start()
   const ids = manifest.contributes.commands.map((c) => c.id).sort()
   assert.deepEqual([...commands.keys()].sort(), ids)
-  assert.equal(Object.keys(plugin.commands).length, 14)
+  assert.equal(Object.keys(plugin.commands).length, 17)
   assert.deepEqual([...handlers.keys()].sort(), manifest.contributes.events.map((e) => e.on).sort())
 })
 
@@ -32,14 +32,14 @@ test('every command is also a panel request handler on a host with orca.panels.h
 
 test('an older host without orca.panels still activates and registers every command', async () => {
   const { commands, panelHandlers } = await start({ noPanels: true })
-  assert.equal(commands.size, 14)
+  assert.equal(commands.size, 17)
   assert.equal(panelHandlers.size, 0)
 })
 
-test('a fresh install seeds all seventeen keys and records that it seeded', async () => {
+test('a fresh install seeds all nineteen keys and records that it seeded', async () => {
   const { calls } = await start({ stored: {} })
   assert.equal(hostCalls({ calls }, 'settings.set').length, Object.keys(DEFAULT_SETTINGS).length)
-  assert.equal(Object.keys(DEFAULT_SETTINGS).length, 17)
+  assert.equal(Object.keys(DEFAULT_SETTINGS).length, 19)
   assert.deepEqual(hostCalls({ calls }, 'storage.set').at(-1), { key: 'seeded', value: true })
 })
 
@@ -253,9 +253,9 @@ test('a budget expiry during deploy stops the sequence and says install may stil
   })
 })
 
-test('activation still registers all fourteen commands when settings.get rejects', async () => {
+test('activation still registers all seventeen commands when settings.get rejects', async () => {
   const fake = await start({ rejectSettingsGet: true })
-  assert.equal(fake.commands.size, 14)
+  assert.equal(fake.commands.size, 17)
   assert.equal(fake.handlers.size, 2)
   assert.ok(fake.logs.some((m) => m.includes('settings host unavailable')))
 })
@@ -345,7 +345,8 @@ test('status writes the panel from the results it just collected', async () => {
 })
 
 test('swap and target-next regenerate the panel afterwards', async () => {
-  const fake = await start({ route: statusRoute({ swap: { stdout: 'swapped\n' } }) })
+  // With browserOnSwap off, the swap reads no status of its own to find the account to open claude.ai as.
+  const fake = await start({ stored: { browserOnSwap: false }, route: statusRoute({ swap: { stdout: 'swapped\n' } }) })
   await fake.run('swap')
   assert.equal(statusExecs(fake), 3)
   await fake.run('target-next')

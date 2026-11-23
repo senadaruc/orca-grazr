@@ -2,7 +2,8 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { start, engine, report, settle, statusExecs, hostCalls, PANEL } from './support/plugin-harness.mjs'
 
-// Official Orca has no commands.execute, so the worker follows the focused workspace while the drain loop runs.
+// Official Orca before 1.4.246 runs none of the page's calls, so the worker follows the focused workspace while the drain
+// loop runs. A host with panels.handle leaves that to the page, which polls the focused host itself (test at the end).
 const FOLLOW_MS = 3000
 const DEVBOX = '00000000-0000-4000-8000-0000000000d1'
 const DEVBOX_2 = '00000000-0000-4000-8000-0000000000d2'
@@ -36,7 +37,7 @@ const pageTarget = (fake) => fake.fs.files.get(PANEL).match(/"target":"([^"]*)"/
 
 test('a change of the focused host re-renders the page with that host selected, and the target setting is not written', async () => {
   const focus = { current: 'local' }
-  const fake = await start({ route: focusRoute(focus) })
+  const fake = await start({ route: focusRoute(focus), noPanels: true })
   assert.equal(pageTarget(fake), 'mac')
   const writes = hostCalls(fake, 'settings.set').length
   focus.current = on(DEVBOX)
@@ -48,7 +49,7 @@ test('a change of the focused host re-renders the page with that host selected, 
 
 test('the page is re-rendered on a change of focus only: the same host on the next poll runs no status', async () => {
   const focus = { current: 'local' }
-  const fake = await start({ route: focusRoute(focus) })
+  const fake = await start({ route: focusRoute(focus), noPanels: true })
   focus.current = on(DEVBOX)
   await followTick(fake)
   const after = statusExecs(fake)
@@ -64,7 +65,7 @@ test('the page is re-rendered on a change of focus only: the same host on the ne
 
 test('a focus that cannot be read leaves the page as it is', async () => {
   const focus = { current: null }
-  const fake = await start({ route: focusRoute(focus) })
+  const fake = await start({ route: focusRoute(focus), noPanels: true })
   await followTick(fake)
   await followTick(fake)
   assert.equal(statusExecs(fake), 0)
@@ -73,7 +74,7 @@ test('a focus that cannot be read leaves the page as it is', async () => {
 
 test('the follow ends with the drain loop: after deactivate a tick reads nothing and renders nothing', async () => {
   const focus = { current: 'local' }
-  const fake = await start({ route: focusRoute(focus) })
+  const fake = await start({ route: focusRoute(focus), noPanels: true })
   fake.plugin.deactivate()
   focus.current = on(DEVBOX)
   const reads = fake.execs.filter((a) => a[0] === '/usr/bin/sqlite3').length
@@ -84,7 +85,7 @@ test('the follow ends with the drain loop: after deactivate a tick reads nothing
 
 test('the followed host stays selected through the drain loop\'s own refreshes', async () => {
   const focus = { current: on(DEVBOX) }
-  const fake = await start({ route: focusRoute(focus) })
+  const fake = await start({ route: focusRoute(focus), noPanels: true })
   await followTick(fake)
   assert.equal(pageTarget(fake), 'devbox')
   await fake.run('drain-now')
@@ -93,10 +94,21 @@ test('the followed host stays selected through the drain loop\'s own refreshes',
 
 test('target-next hands the page back to the target setting: the followed host stops overriding it', async () => {
   const focus = { current: on(DEVBOX) }
-  const fake = await start({ route: focusRoute(focus), stored: { target: 'devbox-2' } })
+  const fake = await start({ route: focusRoute(focus), stored: { target: 'devbox-2' }, noPanels: true })
   await followTick(fake)
   assert.equal(pageTarget(fake), 'devbox')
   await fake.run('target-next')
   assert.equal(fake.state.settings.target, 'mac')
   assert.equal(pageTarget(fake), 'mac')
+})
+
+test('a host with panels.handle arms no follow tick: the page selects the focused host itself, and no rewrite follows a workspace change', async () => {
+  const focus = { current: 'local' }
+  const fake = await start({ route: focusRoute(focus) })
+  assert.equal(fake.timers.armed.some((t) => t.ms === FOLLOW_MS), false)
+  const renames = fake.fs.renames.length
+  focus.current = on(DEVBOX)
+  await fake.run('drain-now')
+  assert.equal(pageTarget(fake), 'mac')
+  assert.equal(fake.fs.renames.length, renames)
 })

@@ -117,9 +117,9 @@ test('reset reads "resets <day> <time>" in the given zone, and is empty without 
 
 // --- account fields ---
 
-test('each entry has name, 1-based index, missing, active, blocked, listed, plan, organization, updated, action and windows', () => {
+test('each entry has name, 1-based index, missing, active, blocked, listed, plan, organization, updated, reset, its page counts and state, action and windows', () => {
   const [a] = listed(fixture())
-  assert.deepEqual(Object.keys(a).sort(), ['action', 'active', 'blocked', 'index', 'listed', 'missing', 'name', 'organization', 'plan', 'updated', 'windows'])
+  assert.deepEqual(Object.keys(a).sort(), ['action', 'active', 'blocked', 'index', 'listed', 'missing', 'name', 'organization', 'plan', 'reset', 'resetCounts', 'resetPage', 'updated', 'windows'])
   assert.equal(a.name, 'a')
   assert.equal(a.index, 1)
   assert.equal(a.missing, false)
@@ -230,7 +230,7 @@ test('the list renders one article per account with its state class, and a List 
   assert.ok(html.includes('<div class="list">'))
   assert.equal(articles(html).length, 5)
   assert.deepEqual(articles(html).map((a) => a.match(/^class="([^"]*)"/)[1]), ['acct acct-active', 'acct acct-ok', 'acct acct-blocked', 'acct acct-ok', 'acct acct-missing'])
-  assert.ok(html.includes('<button class="face" data-face="clock">Clock</button><button class="face" data-face="list">List</button>'))
+  assert.ok(html.includes('<button class="face" data-face="clock" title="Show on a clock when each account runs out at the current pace">Clock</button><button class="face" data-face="list" title="Show every account with its usage bars and reset times">List</button>'))
 })
 
 test('chips: Active, Blocked with its reason, Not in ACCOUNTS, and not enrolled', () => {
@@ -246,11 +246,104 @@ test('chips: Active, Blocked with its reason, Not in ACCOUNTS, and not enrolled'
 
 test('Switch and Re-authenticate… buttons carry their commands; the active and missing accounts have none', () => {
   const html = cardOf(fixture(), { commands: CMD })
-  assert.ok(acct(html, 'b').includes('<button class="act act-swap-to" data-host="mac" data-text="swap b" data-command="swap" data-params="{&quot;host&quot;:&quot;mac&quot;,&quot;account&quot;:&quot;b&quot;}" data-palette="Grazr: Swap to the next account (this workspace&#39;s server)">Switch</button>'))
-  assert.ok(acct(html, 'c').includes('<button class="act act-reauth" data-host="mac" data-text="enrol mac" data-command="enrol" data-params="{&quot;host&quot;:&quot;mac&quot;,&quot;account&quot;:&quot;c&quot;}" data-palette="Grazr: Re-authenticate a blocked account (this workspace&#39;s server)">Re-authenticate…</button>'))
+  assert.ok(acct(html, 'b').includes('<button class="act act-swap-to" data-host="mac" data-text="swap b" data-command="swap" data-params="{&quot;host&quot;:&quot;mac&quot;,&quot;account&quot;:&quot;b&quot;}" data-palette="Grazr: Swap to the next account (this workspace&#39;s server)" title="Make b the active account on mac now">Switch</button>'))
+  assert.ok(acct(html, 'c').includes('<button class="act act-reauth" data-host="mac" data-text="enrol mac" data-command="enrol" data-params="{&quot;host&quot;:&quot;mac&quot;,&quot;account&quot;:&quot;c&quot;}" data-palette="Grazr: Re-authenticate a blocked account (this workspace&#39;s server)" title="Open a terminal to log in to c again; its saved login no longer works">Re-authenticate…</button>'))
   assert.ok(acct(html, 'd').includes('act act-reauth'))
-  assert.equal(acct(html, 'a').includes('<button class="act'), false, 'active: no button')
+  assert.equal(acct(html, 'a').includes('act-swap-to') || acct(html, 'a').includes('act-reauth'), false, 'active: no swap or re-authentication')
   assert.equal(acct(html, 'e').includes('<button class="act'), false, 'missing: no button')
+})
+
+test('every enrolled account offers Open claude.ai, carrying open-browser and its account; a placeholder offers nothing', () => {
+  const html = cardOf(fixture(), { commands: CMD })
+  for (const name of ['a', 'b', 'c', 'd']) {
+    assert.ok(acct(html, name).includes(`<button class="act act-browser" data-host="mac" data-text="" data-command="open-browser" data-params="{&quot;host&quot;:&quot;mac&quot;,&quot;account&quot;:&quot;${name}&quot;}" data-palette="Grazr: Open claude.ai as the active account (this workspace&#39;s server)" title="Open claude.ai in a browser profile signed in as ${name}">Open claude.ai</button>`), name)
+  }
+  assert.equal(acct(html, 'e').includes('act-browser'), false)
+})
+
+// --- limit resets ---
+
+const RESET_CMD = { ...CMD, resetModel: 'reset model', resetFull: 'reset full' }
+const withReset = (names) => {
+  const report = fixture()
+  for (const account of report.accounts) {
+    if (names.includes(account.name)) account.unused_reset = { holds: true, checked_at: 1790870000, valid_until: 1791129200 }
+  }
+  return report
+}
+
+test('the active account with an unused reset says so and offers the model and the full reset', () => {
+  const a = acct(cardOf(withReset(['a']), { commands: RESET_CMD }), 'a')
+  assert.ok(a.includes('<span class="chip chip-on">Reset available</span>'))
+  assert.ok(a.includes('<button class="act act-reset" data-host="mac" data-text="reset model" data-command="limit-reset-model" data-params="{&quot;host&quot;:&quot;mac&quot;}" data-palette="Grazr: Use a model limit reset (type /limit-reset fable into terminal)" title="Type /limit-reset fable into the terminal; Claude names the reset and asks before using it">Model reset</button>'))
+  assert.ok(a.includes('<button class="act act-reset" data-host="mac" data-text="reset full" data-command="limit-reset-full" data-params="{&quot;host&quot;:&quot;mac&quot;}" data-palette="Grazr: Use a full limit reset (type /limit-reset full into terminal)" title="Type /limit-reset full into the terminal; Claude names the reset and asks before using it">Full reset</button>'))
+})
+
+test('a parked account with an unused reset says so and offers both resets, naming itself so the worker swaps first', () => {
+  const b = acct(cardOf(withReset(['b']), { commands: RESET_CMD }), 'b')
+  assert.ok(b.includes('Reset available'))
+  assert.ok(b.includes('<button class="act act-reset" data-host="mac" data-text="reset model" data-command="limit-reset-model" data-params="{&quot;host&quot;:&quot;mac&quot;,&quot;account&quot;:&quot;b&quot;}" data-palette="Grazr: Use a model limit reset (type /limit-reset fable into terminal)" title="Swap mac to b, then type /limit-reset fable into the terminal; Claude names the reset and asks before using it">Swap + Model reset</button>'))
+  assert.ok(b.includes('data-command="limit-reset-full" data-params="{&quot;host&quot;:&quot;mac&quot;,&quot;account&quot;:&quot;b&quot;}"'))
+  assert.ok(b.includes('>Swap + Full reset</button>'))
+})
+
+test('a blocked or unparked account with an unused reset offers no reset: it cannot be swapped to', () => {
+  const html = cardOf(withReset(['c', 'd']), { commands: RESET_CMD })
+  assert.equal(acct(html, 'c').includes('act-reset'), false)
+  assert.equal(acct(html, 'd').includes('act-reset'), false)
+})
+
+test('an active account Claude noted as holding no reset offers none, and no account says a reset is available', () => {
+  const report = fixture()
+  report.accounts[0].unused_reset = { holds: false }
+  const html = cardOf(report, { commands: RESET_CMD })
+  assert.equal(acct(html, 'a').includes('act-reset'), false)
+  assert.equal(html.includes('Reset available'), false)
+  assert.equal(html.includes('reset available'), false)
+})
+
+test('with no note from Claude the active account offers both resets, saying it is not known, and no other account does', () => {
+  const report = fixture()
+  report.accounts[1].unused_reset = null
+  report.accounts[2].unused_reset = 'yes'
+  const html = cardOf(report, { commands: RESET_CMD })
+  const a = acct(html, 'a')
+  assert.ok(a.includes('data-command="limit-reset-model" data-params="{&quot;host&quot;:&quot;mac&quot;}" data-palette="Grazr: Use a model limit reset (type /limit-reset fable into terminal)" title="Type /limit-reset fable into the terminal; not known whether a reset is available, Claude says so and asks before using one">Model reset</button>'))
+  assert.ok(a.includes('data-command="limit-reset-full" data-params="{&quot;host&quot;:&quot;mac&quot;}" data-palette="Grazr: Use a full limit reset (type /limit-reset full into terminal)" title="Type /limit-reset full into the terminal; not known whether a reset is available, Claude says so and asks before using one">Full reset</button>'))
+  assert.equal(html.includes('Swap + '), false)
+  for (const name of ['b', 'c', 'd']) assert.equal(acct(html, name).includes('act-reset'), false)
+  assert.equal(html.includes('Reset available'), false)
+  assert.equal(html.includes('reset available'), false)
+})
+
+test('the dial and clock rows mark an unused reset in the label and carry the buttons on the active row', () => {
+  const html = cardOf(withReset(['a', 'b']), { commands: RESET_CMD })
+  const rows = html.split('<li class="row ').slice(1).map((r) => r.split('</li>')[0])
+  const active = rows.find((r) => r.includes('<span class="row-name">a</span>'))
+  const parked = rows.find((r) => r.includes('<span class="row-name">b</span>'))
+  assert.ok(active.includes('<span class="row-label">active · reset available</span>'))
+  assert.ok(active.includes('data-command="limit-reset-model"') && active.includes('data-command="limit-reset-full"'))
+  assert.ok(parked.includes('reset available</span>'))
+  assert.ok(parked.includes('data-params="{&quot;host&quot;:&quot;mac&quot;,&quot;account&quot;:&quot;b&quot;}"') && parked.includes('>Swap + Model reset</button>'))
+})
+
+test('the dial and clock rows give the active account the resets on no note, without the label, and a parked one none', () => {
+  const html = cardOf(fixture(), { commands: RESET_CMD })
+  const rows = html.split('<li class="row ').slice(1).map((r) => r.split('</li>')[0])
+  const active = rows.find((r) => r.includes('<span class="row-name">a</span>'))
+  const parked = rows.find((r) => r.includes('<span class="row-name">b</span>'))
+  assert.ok(active.includes('<span class="row-label">active</span>'))
+  assert.ok(active.includes('data-command="limit-reset-model"') && active.includes('data-command="limit-reset-full"'))
+  assert.ok(active.includes('not known whether a reset is available'))
+  assert.equal(parked.includes('act-reset'), false)
+})
+
+test('the dial and clock rows give the active account no reset when Claude noted none', () => {
+  const report = fixture()
+  report.accounts[0].unused_reset = { holds: false }
+  const html = cardOf(report, { commands: RESET_CMD })
+  const rows = html.split('<li class="row ').slice(1).map((r) => r.split('</li>')[0])
+  assert.equal(rows.find((r) => r.includes('<span class="row-name">a</span>')).includes('act-reset'), false)
 })
 
 test('a button without its command is left out', () => {
@@ -339,9 +432,10 @@ test('an active account that is blocked offers Re-authenticate… in the data an
   report.accounts[0].blocked = 'token_expired'
   assert.equal(byName(report).a.action, 'reauth')
   const html = cardOf(report, { commands: CMD })
-  assert.ok(acct(html, 'a').includes('<button class="act act-reauth" data-host="mac" data-text="enrol mac" data-command="enrol" data-params="{&quot;host&quot;:&quot;mac&quot;,&quot;account&quot;:&quot;a&quot;}" data-palette="Grazr: Re-authenticate a blocked account (this workspace&#39;s server)">Re-authenticate…</button>'))
+  assert.ok(acct(html, 'a').includes('<button class="act act-reauth" data-host="mac" data-text="enrol mac" data-command="enrol" data-params="{&quot;host&quot;:&quot;mac&quot;,&quot;account&quot;:&quot;a&quot;}" data-palette="Grazr: Re-authenticate a blocked account (this workspace&#39;s server)" title="Open a terminal to log in to a again; its saved login no longer works">Re-authenticate…</button>'))
   assert.equal(byName(fixture()).a.action, null, 'active, not blocked')
-  assert.equal(acct(cardOf(fixture(), { commands: CMD }), 'a').includes('<button class="act'), false)
+  const unblocked = acct(cardOf(fixture(), { commands: CMD }), 'a')
+  assert.equal(unblocked.includes('act-swap-to') || unblocked.includes('act-reauth'), false)
 })
 
 // --- plan chip ---

@@ -71,7 +71,13 @@ function makeElement(tag, doc) {
     get textContent() { return node.text },
     set textContent(value) { node.text = String(value) },
     get innerHTML() { return '' },
-    set innerHTML(value) { node.html = String(value) },
+    // The stub parses no HTML: a test gives the page's markup as JSON cards, and doc.parseCards builds them.
+    set innerHTML(value) {
+      node.html = String(value)
+      if (!doc.parseCards) return
+      node.children = []
+      buildMain(doc, node, doc.parseCards(node.html))
+    },
     classList: {
       contains: (c) => node.classes.has(c),
       toggle: (c, force) => {
@@ -109,6 +115,15 @@ function buildCard(doc, card, selected) {
   section.setAttribute('data-host', card.name)
   section.setAttribute('data-view', 'session')
   section.setAttribute('data-face', 'list')
+  for (const [cls, attr, values] of [['view', 'data-view', ['session', 'weekly']], ['face', 'data-face', ['dial', 'clock', 'list']]]) {
+    for (const value of values) {
+      const toggle = doc.createElement('button')
+      toggle.classList.add(cls)
+      toggle.setAttribute(attr, value)
+      toggle.textContent = value
+      section.appendChild(toggle)
+    }
+  }
   const msg = doc.createElement('p')
   msg.classList.add('msg')
   section.appendChild(msg)
@@ -124,6 +139,16 @@ function buildCard(doc, card, selected) {
     section.appendChild(button)
   }
   return section
+}
+
+// Fills a main element as the renderer does: the tab strip, then one card per host; the target (the first card unless one is marked open) is selected.
+export function buildMain(doc, main, cards) {
+  const selected = cards.find((card) => card.open) ?? cards[0]
+  const nav = main.appendChild(makeElement('nav', doc))
+  nav.setAttribute('role', 'tablist')
+  nav.classList.add('host-tabs')
+  cards.forEach((card, slot) => nav.appendChild(buildTab(doc, card, card === selected, slot)))
+  for (const card of cards) main.appendChild(buildCard(doc, card, card === selected))
 }
 
 // Loads the page with the given data: { generatedAt, target, cards: [{ name, buttons, open }] }, or no cards for the placeholder.
@@ -153,19 +178,14 @@ export async function loadPage({ generatedAt = null, cards = [], html = null, tr
   doc.body.appendChild(stamp)
   doc.body.appendChild(makeElement('div', doc)).classList.add('tip')
   const main = doc.body.appendChild(makeElement('main', doc))
-  // As the renderer does, the target (the first card unless one is marked open) is the selected host.
-  const selected = cards.find((card) => card.open) ?? cards[0]
-  const nav = main.appendChild(makeElement('nav', doc))
-  nav.setAttribute('role', 'tablist')
-  nav.classList.add('host-tabs')
-  cards.forEach((card, slot) => nav.appendChild(buildTab(doc, card, card === selected, slot)))
-  for (const card of cards) main.appendChild(buildCard(doc, card, card === selected))
+  buildMain(doc, main, cards)
 
   const calls = []
   const messageListeners = []
   const frameWaiters = []
   const timers = []
   const intervals = []
+  const pushListeners = []
   // The page's objects live in the vm's realm; a JSON copy makes them plain host objects for the assertions.
   const copy = (value) => JSON.parse(JSON.stringify(value))
   const win = {
@@ -185,6 +205,8 @@ export async function loadPage({ generatedAt = null, cards = [], html = null, tr
         // request says whether the host offers plugin.request (Orca 1.4.246+); every other method is offered.
         has: (method) => (method === 'plugin.request' ? request : true),
       }),
+      // Orca 1.4.246+ posts from the worker reach the page through orca.plugin.on(event, fn).
+      ...(request ? { plugin: Object.freeze({ on: (event, fn) => { pushListeners.push({ event, fn }); return { dispose() {} } } }) } : {}),
     }
   }
   const data = { generatedAt, target: cards[0]?.name ?? null, hosts: {} }
@@ -212,6 +234,8 @@ export async function loadPage({ generatedAt = null, cards = [], html = null, tr
     stamp,
     doc,
     main,
+    win,
+    data: () => copy(sandbox.data),
     async respond(index, result) {
       if (transport === 'frame') {
         const waiter = frameWaiters[index]
@@ -251,6 +275,12 @@ export async function loadPage({ generatedAt = null, cards = [], html = null, tr
       return prevented
     },
     focused: () => doc.focused ?? null,
+    // Delivers a worker post to the page's listeners of that event, as the host's plugin.push does.
+    async push(event, payload) {
+      for (const l of pushListeners.filter((x) => x.event === event)) l.fn(JSON.parse(JSON.stringify(payload)))
+      await flush()
+    },
+    pushEvents: () => pushListeners.map((l) => l.event),
     flush,
     cardOf: (name) => doc.body.querySelectorAll('section.host').find((s) => s.getAttribute('data-host') === name),
     buttonOf: (name, kind) => doc.body.querySelectorAll(`button.act-${kind}`).find((b) => b.closest('section.host')?.getAttribute('data-host') === name) ?? null,

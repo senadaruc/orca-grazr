@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { EventEmitter } from 'node:events'
 import { createSigninJobs, LOGIN_TIMEOUT_MS, URL_TIMEOUT_MS } from '../../lib/signin.mjs'
 import { fixtureSettings } from './fixture-hosts.mjs'
+import { createAccountProfiles } from '../../lib/browser-profiles.mjs'
 
 export const SETTINGS = fixtureSettings({})
 export const MAC = SETTINGS.hosts.find((h) => h.name === 'mac')
@@ -47,6 +48,9 @@ export const argAfter = (call, flag) => call.args[call.args.indexOf(flag) + 1]
 export function harness({ settings = SETTINGS, overrides = {}, spawnThrows = null, loginTimeoutMs, urlTimeoutMs, suffix = () => SUFFIX, nowMs = null, pluginRoot = null } = {}) {
   // The clock the jobs read: fixed unless a test moves nowMs.
   const clockNow = { ms: nowMs }
+  // The plugin's storage, where the account profiles are remembered.
+  const store = {}
+  const storage = { get: async (key) => store[key], set: async (key, value) => { store[key] = value } }
   const calls = []
   // The sign-in tab: open until a test closes it. A second click only switches to an open tab.
   const tab = { open: true }
@@ -137,8 +141,9 @@ export function harness({ settings = SETTINGS, overrides = {}, spawnThrows = nul
     pluginRoot,
     loginTimeoutMs: loginTimeoutMs ?? LOGIN_TIMEOUT_MS,
     urlTimeoutMs: urlTimeoutMs ?? URL_TIMEOUT_MS,
+    profiles: createAccountProfiles({ storage, log: (m) => logs.push(m) }),
   })
-  return { jobs, calls, spawns, published, logs, profiles, clock, clockNow, screen, closeTab: () => { tab.open = false }, get refreshes() { return refreshes } }
+  return { jobs, calls, spawns, published, logs, profiles, store, clock, clockNow, screen, closeTab: () => { tab.open = false }, get refreshes() { return refreshes } }
 }
 
 // Timers are recorded, never fired by themselves; a test fires the one it means.

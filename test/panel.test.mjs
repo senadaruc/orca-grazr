@@ -133,9 +133,9 @@ test('renderPanel JSON data cannot close the script tag', () => {
   assert.ok(html.includes('\\u003c/script>'))
 })
 
-test('placeholderPanel mentions Grazr: Refresh panel and says installed copies never write', () => {
+test('placeholderPanel mentions Grazr: Reload panel and says installed copies never write', () => {
   const html = placeholderPanel(TEMPLATE)
-  assert.ok(html.includes('Grazr: Refresh panel'))
+  assert.ok(html.includes('Grazr: Reload panel'))
   assert.ok(html.includes('Installed copies never write this page'))
   assert.ok(html.includes('development install'))
   assert.equal(html.includes('<!--__CARDS__-->'), false)
@@ -418,9 +418,9 @@ test('renderCard marks an outdated engine with an orange chip and a default mess
 test('renderCard has a rotation button that types the off command while rotation is on, and the on command while off', () => {
   const commands = { mac: { refresh: 'R', enrol: 'E', swap: 'S', swapTo: {}, rotationOn: 'ON1', rotationOff: 'OFF0' } }
   const on = renderCard(reachableHost(report(), '0.4.7+fork.6', true), commands)
-  assert.ok(on.includes('<button class="act act-rotation" data-host="mac" data-text="OFF0" data-command="rotation-toggle" data-params="{&quot;host&quot;:&quot;mac&quot;,&quot;enabled&quot;:false}" data-palette="Grazr: Turn rotation on/off (this workspace&#39;s server)">Turn rotation off</button>'))
+  assert.ok(on.includes('<button class="act act-rotation" data-host="mac" data-text="OFF0" data-command="rotation-toggle" data-params="{&quot;host&quot;:&quot;mac&quot;,&quot;enabled&quot;:false}" data-palette="Grazr: Turn rotation on/off (this workspace&#39;s server)" title="Stop swapping accounts automatically on mac">Turn rotation off</button>'))
   const off = renderCard(reachableHost(report(), '0.4.7+fork.6', false), commands)
-  assert.ok(off.includes('<button class="act act-rotation" data-host="mac" data-text="ON1" data-command="rotation-toggle" data-params="{&quot;host&quot;:&quot;mac&quot;,&quot;enabled&quot;:true}" data-palette="Grazr: Turn rotation on/off (this workspace&#39;s server)">Turn rotation on</button>'))
+  assert.ok(off.includes('<button class="act act-rotation" data-host="mac" data-text="ON1" data-command="rotation-toggle" data-params="{&quot;host&quot;:&quot;mac&quot;,&quot;enabled&quot;:true}" data-palette="Grazr: Turn rotation on/off (this workspace&#39;s server)" title="Swap accounts automatically on mac when usage drops below the thresholds">Turn rotation on</button>'))
   const unreachable = renderCard(panelOf(report()).hosts[1], commands)
   assert.ok(!unreachable.includes('act-rotation'))
 })
@@ -428,7 +428,7 @@ test('renderCard has a rotation button that types the off command while rotation
 test('the page footer no longer carries the global as-of time', () => {
   const html = renderPanel(panelOf(report()), { template: PAGE, commands: {} })
   assert.ok(!html.includes("'as of '"))
-  assert.ok(html.includes("textContent = 'Cmd-J Grazr: Refresh panel'"))
+  assert.ok(html.includes("textContent = 'Cmd-J Grazr: Reload panel'"))
 })
 
 test('renderPanel escapes an engine version that carries markup and quotes, in the engine line', () => {
@@ -466,7 +466,9 @@ test('the footer buttons lay out as a responsive grid, one row when wide and a g
   assert.ok(PAGE.includes('.actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }'))
   assert.ok(PAGE.includes('@media (min-width: 540px) { .actions { grid-template-columns: repeat(4, minmax(0, 1fr)); } }'))
   assert.equal(/\.actions\s*\{[^}]*flex/.test(PAGE), false)
-  assert.ok(/\.row > \.act\s*\{[^}]*justify-self: start/.test(PAGE))
+  // A row's buttons sit in their own flex strip under the name, so two of them share a line and neither stretches.
+  assert.ok(/\.row-acts\s*\{[^}]*grid-column: 2 \/ -1/.test(PAGE))
+  assert.ok(/\.row-acts\s*\{[^}]*display: flex/.test(PAGE))
   assert.ok(PAGE.includes('.actions > .act:only-child { justify-self: start; }'))
 })
 
