@@ -4,6 +4,18 @@ All notable changes to this plugin are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## 0.11.6 - 2026-11-26
+
+### Fixed
+
+- The panel refreshes as soon as a sign-in has its result, whether it succeeded or failed, and again at the end. Before, it waited for the cleanup (discarding the login over ssh, closing the tab) and the notification, so after a re-authentication the account stayed "Blocked" for about 15 seconds. The sign-in tab now also closes before the slower discard on the login host, and a refresh that fails is logged and never stops the cleanup.
+
+## 0.11.5 - 2026-11-26
+
+### Fixed
+
+- Sign-ins work again with Claude Code 2.1.330 and later. Its sign-in address is short and carries no state, and its code page shows the code as text instead of in the address, so every sign-in waited on a callback and enrolled nothing. The relay now learns the state from the tab (the long authorize address, or the login page whose `returnTo` carries it) and reads the code from the callback page with a snapshot. It relays only a code whose state matches the one expected, once, and never logs or shows it. Addresses printed with a state work as before.
+
 ## 0.11.4 - 2026-11-23
 
 ### Changed

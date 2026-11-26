@@ -64,7 +64,7 @@ const restarts = (h) => callsWith(h, 'goto')
 const logged = (h, text) => h.logs.filter((m) => m.includes(text)).length
 const finish = async (h, login) => {
   login.exit(0)
-  await until(() => h.refreshes === 1)
+  await until(() => h.refreshes === 2)
 }
 
 test('a re-authentication walks the whole sign-in: fill the e-mail, Continue, open the code box, then the code box is left alone', async () => {

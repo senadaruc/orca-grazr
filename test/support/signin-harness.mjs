@@ -67,7 +67,9 @@ export function harness({ settings = SETTINGS, overrides = {}, spawnThrows = nul
   const logs = []
   const profiles = []
   const clock = fakeClock()
+  // Each job refreshes the panel twice: right after its attempt, and at the end after its notification.
   let refreshes = 0
+  const refreshEvents = []
   let dirs = 0
   let pages = 0
   let made = 0
@@ -143,7 +145,10 @@ export function harness({ settings = SETTINGS, overrides = {}, spawnThrows = nul
     timers: clock,
     log: (m) => logs.push(m),
     publish: async (t) => { published.push(t) },
-    refreshPanel: async () => { refreshes++ },
+    refreshPanel: async () => {
+      refreshEvents.push({ calls: calls.length, published: published.length })
+      refreshes++
+    },
     now: () => (clockNow.ms === null ? NOW : new Date(clockNow.ms)),
     suffix,
     pluginRoot,
@@ -151,7 +156,7 @@ export function harness({ settings = SETTINGS, overrides = {}, spawnThrows = nul
     urlTimeoutMs: urlTimeoutMs ?? URL_TIMEOUT_MS,
     profiles: createAccountProfiles({ storage, log: (m) => logs.push(m) }),
   })
-  return { jobs, calls, spawns, published, logs, profiles, store, clock, clockNow, screen, closeTab: () => { tab.open = false }, get refreshes() { return refreshes } }
+  return { jobs, calls, spawns, published, logs, profiles, store, clock, clockNow, screen, closeTab: () => { tab.open = false }, get refreshes() { return refreshes }, refreshEvents }
 }
 
 // Timers are recorded, never fired by themselves; a test fires the one it means.

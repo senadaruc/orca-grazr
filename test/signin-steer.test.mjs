@@ -44,11 +44,11 @@ test('the new tab is brought to the front in its workspace; a failure is logged 
   const other = await openRemoteTab(failing, null)
   assert.ok(failing.logs.some((m) => m.includes('could not be brought to the front: window busy')), failing.logs.join(' | '))
   other.exit(0)
-  await until(() => failing.refreshes === 1)
+  await until(() => failing.refreshes === 2)
   assert.equal(failing.published[0].title, 'devbox: signed in')
 
   login.exit(0)
-  await until(() => h.refreshes === 1)
+  await until(() => h.refreshes === 2)
   assert.equal(h.published[0].title, 'devbox: signed in')
 })
 
@@ -64,7 +64,7 @@ test('a tab that lands on claude.ai/new is returned to the authorize page with o
   assert.equal(argAfter(goto, '--url'), URL)
   assert.equal(goto.args.includes('--environment'), false)
   login.exit(0)
-  await until(() => h.refreshes === 1)
+  await until(() => h.refreshes === 2)
   assert.equal(h.published[0].title, 'devbox: signed in')
   assertCleaned(h, { dir: D1, page: 'page-1' })
 })
@@ -88,7 +88,7 @@ test('a tab on the sign-in flow is never steered: the login page, its sub-pages,
     assert.equal(steered(h).length, 0, url)
   }
   login.exit(0)
-  await until(() => h.refreshes === 1)
+  await until(() => h.refreshes === 2)
 })
 
 test('a page off claude.ai and claude.com is not steered', async () => {
@@ -100,7 +100,7 @@ test('a page off claude.ai and claude.com is not steered', async () => {
   await tick(h)
   assert.equal(steered(h).length, 0)
   login.exit(0)
-  await until(() => h.refreshes === 1)
+  await until(() => h.refreshes === 2)
 })
 
 test('a steer waits STEER_GAP_MS after the last one: an answer one millisecond early is not steered, the next one is', async () => {
@@ -116,7 +116,7 @@ test('a steer waits STEER_GAP_MS after the last one: an answer one millisecond e
   await tick(h)
   await until(() => steered(h).length === 2)
   login.exit(0)
-  await until(() => h.refreshes === 1)
+  await until(() => h.refreshes === 2)
 })
 
 test('a sign-in steers a tab at most STEER_MAX times, each logged with its count, and then leaves it alone', async () => {
@@ -134,7 +134,7 @@ test('a sign-in steers a tab at most STEER_MAX times, each logged with its count
   assert.match(lines.at(-1), new RegExp(`\\(${STEER_MAX} of ${STEER_MAX}\\)$`))
   assert.equal(h.clock.hasTimer(RELAY_POLL_MS), true, 'polling goes on after the cap')
   login.exit(0)
-  await until(() => h.refreshes === 1)
+  await until(() => h.refreshes === 2)
 })
 
 test('a goto that fails is logged, and polling goes on', async () => {
@@ -146,7 +146,7 @@ test('a goto that fails is logged, and polling goes on', async () => {
   assert.ok(h.logs.some((m) => m.includes('could not be returned to the authorize page: tab busy')))
   assert.equal(h.clock.hasTimer(RELAY_POLL_MS), true)
   login.exit(0)
-  await until(() => h.refreshes === 1)
+  await until(() => h.refreshes === 2)
 })
 
 test('offTheFlow: claude.ai and claude.com pages outside the sign-in flow', () => {
@@ -175,7 +175,7 @@ test('a second click for the same account while its tab is open switches to that
     assert.equal(argAfter(c, '--worktree'), WORKSPACE)
   }
   first.exit(0)
-  await until(() => h.refreshes === 1)
+  await until(() => h.refreshes === 2)
   assert.equal(h.published[0].title, 'devbox: signed in')
 })
 
@@ -198,7 +198,7 @@ test('the window is 30 minutes: the remote login is wrapped in timeout 1830 and 
   assert.match(h.spawns[0].args.at(-1), /exec timeout -k 5 1830 /)
   h.clock.fire(LOGIN_TIMEOUT_MS)
   h.spawns[0].child.exit(null, '', 'SIGTERM')
-  await until(() => h.refreshes === 1)
+  await until(() => h.refreshes === 2)
   assert.equal(h.published[0].title, 'devbox: sign-in timed out')
 })
 

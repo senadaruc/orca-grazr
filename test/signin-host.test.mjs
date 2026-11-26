@@ -10,7 +10,7 @@ const listing = (...worktrees) => ({ 'worktree list': () => ({ stdout: json({ ok
 
 // Ends a started sign-in through its login and waits for the card to be told.
 async function finish(h, login, exit = 0) {
-  const next = h.refreshes + 1
+  const next = h.refreshes + 2
   login.exit(exit)
   await until(() => h.refreshes === next)
 }
@@ -41,7 +41,7 @@ test('the default workspace is the first local worktree, unless the plugin folde
   await until(() => callsWith(first, 'tab create').length === 1)
   assert.equal(argAfter(callsWith(first, 'tab create')[0], '--worktree'), 'id:aa11::/home/t/src/other', 'no plugin folder listed: the first one')
   first.spawns[0].child.exit(null, '', 'SIGTERM')
-  await until(() => first.refreshes === 1)
+  await until(() => first.refreshes === 2)
 
   const plugin = harness({ overrides: listing(OTHER, LOCAL_WORKTREE), pluginRoot: LOCAL_WORKTREE.path })
   const outcome = await plugin.jobs.start({ host: DEV, settings: SETTINGS, account: null })
@@ -51,7 +51,7 @@ test('the default workspace is the first local worktree, unless the plugin folde
   await until(() => callsWith(plugin, 'tab create').length === 1)
   assert.equal(argAfter(callsWith(plugin, 'tab create')[0], '--worktree'), WORKSPACE, 'the plugin folder wins')
   plugin.spawns[0].child.exit(null, '', 'SIGTERM')
-  await until(() => plugin.refreshes === 1)
+  await until(() => plugin.refreshes === 2)
 })
 
 test('signinWorkspace names the workspace the tab opens in, by id: or path:, and is labelled from the list when it is there', async () => {
@@ -60,7 +60,7 @@ test('signinWorkspace names the workspace the tab opens in, by id: or path:, and
   assert.equal((await a.jobs.start({ host: DEV, settings: byId, account: null })).message, "Signing in a new account in Orca's browser — sign in, then approve Claude Code")
   await until(() => a.spawns.length === 1)
   a.spawns[0].child.exit(null, '', 'SIGTERM')
-  await until(() => a.refreshes === 1)
+  await until(() => a.refreshes === 2)
 
   const byPath = fixtureSettings({ signinWorkspace: 'path:/home/t/elsewhere' })
   const b = harness({ settings: byPath, overrides: listing(LOCAL_WORKTREE) })
@@ -70,7 +70,7 @@ test('signinWorkspace names the workspace the tab opens in, by id: or path:, and
   await until(() => callsWith(b, 'tab create').length === 1)
   assert.equal(argAfter(callsWith(b, 'tab create')[0], '--worktree'), 'path:/home/t/elsewhere')
   b.spawns[0].child.exit(null, '', 'SIGTERM')
-  await until(() => b.refreshes === 1)
+  await until(() => b.refreshes === 2)
 })
 
 test('no local worktree: the sign-in is refused with the message, and nothing runs', async () => {
@@ -137,7 +137,7 @@ test('a Mac card with no signinHost logs in on the first remote host; the start 
   await until(() => h.spawns.length === 1)
   assert.equal(h.spawns[0].args.at(-2), 'devbox')
   h.spawns[0].child.exit(null, '', 'SIGTERM')
-  await until(() => h.refreshes === 1)
+  await until(() => h.refreshes === 2)
 })
 
 // Starts a sign-in and waits until its tab is open; returns the login.

@@ -10,13 +10,13 @@ test('Orca pretty-printed JSON replies parse, and a single-line reply still pars
   assert.equal(callsWith(pretty, 'tab profile list').length >= 1, true)
   assert.equal(argAfter(callsWith(pretty, 'tab create')[0], '--profile'), 'p1')
   a.exit(null, '', 'SIGTERM')
-  await until(() => pretty.refreshes === 1)
+  await until(() => pretty.refreshes === 2)
 
   const oneLine = harness({ overrides: { 'tab profile list': () => ({ stdout: singleLine({ ok: true, result: { profiles: oneLine.profiles } }) }) } })
   const b = await openRemoteTab(oneLine, null)
   assert.equal(argAfter(callsWith(oneLine, 'tab create')[0], '--profile'), 'p1')
   b.exit(null, '', 'SIGTERM')
-  await until(() => oneLine.refreshes === 1)
+  await until(() => oneLine.refreshes === 2)
 })
 
 test('the remote login runs over plain ssh (no pty), in its own process group, under timeout(1) that kills claude after TERM', async () => {
@@ -30,7 +30,7 @@ test('the remote login runs over plain ssh (no pty), in its own process group, u
   assert.equal(args.at(-1), `CLAUDE_CONFIG_DIR=${D1} setsid sh -c 'echo grazr-pid:$$; exec timeout -k ${REMOTE_KILL_AFTER_S} ${REMOTE_LOGIN_TIMEOUT_S} ~/.local/bin/claude auth login'`)
   assert.equal(REMOTE_LOGIN_TIMEOUT_S, 1830)
   h.spawns[0].child.exit(null, '', 'SIGTERM')
-  await until(() => h.refreshes === 1)
+  await until(() => h.refreshes === 2)
 })
 
 test('a CRLF pty line carries the address; a bare address is taken after 500 ms of quiet; the end of output takes it too', async () => {
@@ -38,7 +38,7 @@ test('a CRLF pty line carries the address; a bare address is taken after 500 ms 
   const a = await openRemoteTab(crlf, null)
   assert.equal(callsWith(crlf, 'tab create')[0].args.includes(URL), true)
   a.exit(null, '', 'SIGTERM')
-  await until(() => crlf.refreshes === 1)
+  await until(() => crlf.refreshes === 2)
 
   const bare = harness()
   bare.jobs.start({ host: DEV, settings: SETTINGS, account: null })
@@ -48,7 +48,7 @@ test('a CRLF pty line carries the address; a bare address is taken after 500 ms 
   bare.clock.fire(500)
   await until(() => callsWith(bare, 'tab create').length === 1)
   bare.spawns[0].child.exit(null, '', 'SIGTERM')
-  await until(() => bare.refreshes === 1)
+  await until(() => bare.refreshes === 2)
 
   const ended = harness()
   ended.jobs.start({ host: DEV, settings: SETTINGS, account: null })
@@ -57,7 +57,7 @@ test('a CRLF pty line carries the address; a bare address is taken after 500 ms 
   ended.spawns[0].child.stdout.emit('end')
   await until(() => callsWith(ended, 'tab create').length === 1)
   ended.spawns[0].child.exit(null, '', 'SIGTERM')
-  await until(() => ended.refreshes === 1)
+  await until(() => ended.refreshes === 2)
 })
 
 test('the address may come on stderr', async () => {
@@ -67,7 +67,7 @@ test('the address may come on stderr', async () => {
   h.spawns[0].child.stderr.emit('data', Buffer.from(VISIT))
   await until(() => callsWith(h, 'tab create').length === 1)
   h.spawns[0].child.exit(null, '', 'SIGTERM')
-  await until(() => h.refreshes === 1)
+  await until(() => h.refreshes === 2)
 })
 
 test('an address on a site that is not Claude is not opened: the login is stopped and the card says so', async () => {
@@ -78,7 +78,7 @@ test('an address on a site that is not Claude is not opened: the login is stoppe
   child.stdout.emit('data', Buffer.from('visit: https://evil.example.com/login\n'))
   await until(() => child.signals.length === 1)
   child.exit(null, '', 'SIGTERM')
-  await until(() => h.refreshes === 1)
+  await until(() => h.refreshes === 2)
   assert.match(h.published[0].body, /not on claude\.ai, claude\.com or anthropic\.com, so nothing was opened/)
   assert.equal(callsWith(h, 'tab create').length, 0)
   assert.equal(callsWith(h, 'tab profile').length, 0)
@@ -107,7 +107,7 @@ test('a tab that fails to open: tabs on the same address are closed, and the log
   child.emitUrl()
   await until(() => child.signals.length === 1)
   child.exit(null, '', 'SIGTERM')
-  await until(() => h.refreshes === 1)
+  await until(() => h.refreshes === 2)
   assert.equal(closesOf(h, 'stale-9').length, 1)
   assert.equal(closesOf(h, 'keep').length, 0)
   assert.equal(callsWith(h, 'login-discard').length, 1)
@@ -156,7 +156,7 @@ test('when the list after the create fails, the fresh profile is found again by 
   h.spawns[0].child.emitUrl()
   await until(() => h.refreshes === 0 && callsWith(h, 'tab profile create').length === 1)
   h.spawns[0].child.exit(0)
-  await until(() => h.refreshes === 1)
+  await until(() => h.refreshes === 2)
   assert.equal(argAfter(deletesOf(h)[0], '--profile'), 'p1')
   assert.equal(h.published[0].body, 'Orca\'s browser in the orca-grazr workspace could not open the sign-in: busy\nNothing was enrolled.')
   assert.deepEqual(h.profiles, [])
@@ -176,7 +176,7 @@ test('two concurrent add-account sign-ins get distinct fresh profiles, and each 
   assert.equal(new Set(used).size, 2, 'each sign-in has its own profile')
   h.spawns[0].child.exit(0)
   h.spawns[1].child.exit(0)
-  await until(() => h.refreshes === 2)
+  await until(() => h.refreshes === 4)
   // Both enrolled, so both profiles stay; the e-mail they share maps to the one kept last.
   assert.equal(h.profiles.length, 2)
   assert.equal(deletesOf(h).length, 0)
@@ -189,7 +189,7 @@ test('the limit firing before the address appears reports a timed-out sign-in', 
   await until(() => h.spawns.length === 1)
   h.clock.fire(LOGIN_TIMEOUT_MS)
   h.spawns[0].child.exit(null, '', 'SIGTERM')
-  await until(() => h.refreshes === 1)
+  await until(() => h.refreshes === 2)
   assert.equal(h.published[0].title, 'devbox: sign-in timed out')
   assert.equal(h.published[0].body, 'Nothing was enrolled.')
   assert.equal(callsWith(h, 'tab create').length, 0)
